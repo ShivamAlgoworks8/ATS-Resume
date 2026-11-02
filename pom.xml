@@ -19,6 +19,7 @@
 
     <properties>
         <java.version>21</java.version>
+        <tika.version>2.9.2</tika.version>
     </properties>
 
     <dependencies>
@@ -29,6 +30,17 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-mongodb</artifactId>
+        </dependency>
+        <!-- Apache Tika: detects file type and extracts text from PDF/DOCX -->
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-core</artifactId>
+            <version>${tika.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-parsers-standard-package</artifactId>
+            <version>${tika.version}</version>
         </dependency>
     </dependencies>
 

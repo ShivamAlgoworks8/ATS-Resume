@@ -1,6 +1,6 @@
 package com.atsresume.repository;
 
-import com.atsresume.model.Resume;
+import com.atsresume.entity.Resume;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 /**
