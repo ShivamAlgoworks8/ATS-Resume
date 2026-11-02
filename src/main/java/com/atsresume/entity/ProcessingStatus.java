@@ -9,3 +9,4 @@ public enum ProcessingStatus {
     /** Text extraction failed. */
     FAILED
 }
+
