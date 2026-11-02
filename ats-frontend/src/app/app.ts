@@ -1,12 +1,13 @@
-import { Component, signal } from '@angular/core';
+import { Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { SidebarComponent } from './shared/sidebar/sidebar.component';
+import { TopbarComponent } from './shared/topbar/topbar.component';
+import { ToastComponent } from './shared/toast/toast.component';
 
 @Component({
-  imports: [RouterOutlet],
   selector: 'app-root',
-  styleUrl: './app.scss',
+  standalone: true,
+  imports: [RouterOutlet, SidebarComponent, TopbarComponent, ToastComponent],
   templateUrl: './app.html',
 })
-export class App {
-  protected readonly title = signal('ats-frontend');
-}
+export class App {}
