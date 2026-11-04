@@ -1,5 +1,6 @@
 package com.atsresume.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDateTime;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -18,8 +19,12 @@ public class Resume {
     /** Original name of the uploaded file (e.g. "my_resume.pdf") */
     private String originalFileName;
 
-    /** Stored unique file name on disk (e.g. "uuid_my_resume.pdf") */
+    /** Editable file name shown through the API. */
     private String fileName;
+
+    /** Private disk storage key. Kept separate from editable API file names. */
+    @JsonIgnore
+    private String storageFileName;
 
     /** File extension / format: "pdf" or "docx" */
     private String fileType;
@@ -72,6 +77,16 @@ public class Resume {
 
     public void setFileName(String fileName) {
         this.fileName = fileName;
+    }
+
+    @JsonIgnore
+    public String getStorageFileName() {
+        return storageFileName;
+    }
+
+    @JsonIgnore
+    public void setStorageFileName(String storageFileName) {
+        this.storageFileName = storageFileName;
     }
 
     public String getFileType() {

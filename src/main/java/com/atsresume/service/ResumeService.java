@@ -66,11 +66,12 @@ public class ResumeService {
         String extension = validateFile(file);
 
         String originalName = cleanName(file.getOriginalFilename());
-        String storedFileName = UUID.randomUUID() + "_" + originalName;
+        String storedFileName = UUID.randomUUID() + "." + extension;
 
         Resume resume = new Resume();
         resume.setOriginalFileName(originalName);
-        resume.setFileName(storedFileName);
+        resume.setFileName(originalName);
+        resume.setStorageFileName(storedFileName);
         resume.setFileType(extension);
         resume.setFileSize(file.getSize());
         resume.setUploadDate(LocalDateTime.now());
@@ -83,7 +84,12 @@ public class ResumeService {
         extractText(resume);
 
         // Save metadata and extracted text into MongoDB
-        return resumeRepository.save(resume);
+        try {
+            return resumeRepository.save(resume);
+        } catch (RuntimeException e) {
+            deleteFileFromDisk(storedFileName);
+            throw e;
+        }
     }
 
     /**
@@ -118,6 +124,8 @@ public class ResumeService {
         if (hasOriginal) {
             resume.setOriginalFileName(cleanName(request.getOriginalFileName()));
         }
+        // Preserve the disk key for documents created before storageFileName existed.
+        resume.setStorageFileName(storageName(resume));
         if (hasFileName) {
             resume.setFileName(cleanName(request.getFileName()));
         }
@@ -141,28 +149,44 @@ public class ResumeService {
 
         if (hasFile) {
             String extension = validateFile(file);
-            String oldStoredFileName = resume.getFileName();
+            String oldStoredFileName = storageName(resume);
             String newOriginalName = cleanName(file.getOriginalFilename());
-            String newStoredName = UUID.randomUUID() + "_" + newOriginalName;
+            String newStoredName = UUID.randomUUID() + "." + extension;
 
             saveFileToDisk(file, newStoredName);
 
             resume.setOriginalFileName(newOriginalName);
-            resume.setFileName(newStoredName);
+            resume.setFileName(newOriginalName);
+            resume.setStorageFileName(newStoredName);
             resume.setFileType(extension);
             resume.setFileSize(file.getSize());
             resume.setUploadDate(LocalDateTime.now());
             resume.setProcessingStatus(ProcessingStatus.PENDING);
 
+            if (hasOriginal) {
+                resume.setOriginalFileName(cleanName(originalFileName));
+            }
+            if (hasFileName) {
+                resume.setFileName(cleanName(fileName));
+            }
+
             extractText(resume);
 
-            // Remove previous file from disk
-            deleteFileFromDisk(oldStoredFileName);
+            try {
+                Resume savedResume = resumeRepository.save(resume);
+                deleteFileFromDisk(oldStoredFileName);
+                return savedResume;
+            } catch (RuntimeException e) {
+                deleteFileFromDisk(newStoredName);
+                throw e;
+            }
         }
 
         if (hasOriginal) {
             resume.setOriginalFileName(cleanName(originalFileName));
         }
+        // Preserve the disk key for documents created before storageFileName existed.
+        resume.setStorageFileName(storageName(resume));
         if (hasFileName) {
             resume.setFileName(cleanName(fileName));
         }
@@ -176,7 +200,7 @@ public class ResumeService {
     public void deleteResume(String id) {
         Resume resume = getResumeById(id);
         resumeRepository.delete(resume);
-        deleteFileFromDisk(resume.getFileName());
+        deleteFileFromDisk(storageName(resume));
     }
 
     // ---------- Helper Methods ----------
@@ -225,7 +249,18 @@ public class ResumeService {
         }
         String cleaned = name.replace('\\', '/');
         int lastSlash = cleaned.lastIndexOf('/');
-        return (lastSlash >= 0) ? cleaned.substring(lastSlash + 1) : cleaned;
+        String baseName = (lastSlash >= 0) ? cleaned.substring(lastSlash + 1) : cleaned;
+        baseName = baseName.trim();
+        return (baseName.isBlank() || ".".equals(baseName) || "..".equals(baseName)) ? "resume" : baseName;
+    }
+
+    /** Supports records created before storageFileName was introduced. */
+    private String storageName(Resume resume) {
+        String storageFileName = resume.getStorageFileName();
+        if (storageFileName == null || storageFileName.isBlank()) {
+            storageFileName = resume.getFileName();
+        }
+        return (storageFileName == null || storageFileName.isBlank()) ? null : cleanName(storageFileName);
     }
 
 
@@ -261,7 +296,7 @@ public class ResumeService {
      */
     private void extractText(Resume resume) {
         try {
-            String text = tika.parseToString(uploadDir.resolve(resume.getFileName()));
+            String text = tika.parseToString(uploadDir.resolve(storageName(resume)));
             resume.setExtractedText((text != null) ? text.trim() : "");
             resume.setProcessingStatus(ProcessingStatus.COMPLETED);
         } catch (Exception e) {
