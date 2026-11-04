@@ -13,7 +13,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
-/** Converts exceptions into a consistent JSON error body: timestamp, status, error, message. */
+/**
+ * Global Exception Handler providing standardized, beginner-friendly JSON error responses.
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -21,37 +23,42 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleNotFound(ResourceNotFoundException ex) {
-        return build(HttpStatus.NOT_FOUND, ex.getMessage());
+        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
     @ExceptionHandler(InvalidFileException.class)
     public ResponseEntity<Map<String, Object>> handleInvalidFile(InvalidFileException ex) {
-        return build(HttpStatus.BAD_REQUEST, ex.getMessage());
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
     @ExceptionHandler(MissingServletRequestPartException.class)
     public ResponseEntity<Map<String, Object>> handleMissingPart(MissingServletRequestPartException ex) {
-        return build(HttpStatus.BAD_REQUEST, "Required part '" + ex.getRequestPartName() + "' is missing");
+        return buildResponse(HttpStatus.BAD_REQUEST, "Required part '" + ex.getRequestPartName() + "' is missing");
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     public ResponseEntity<Map<String, Object>> handleMediaType(HttpMediaTypeNotSupportedException ex) {
-        return build(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Request must be multipart/form-data");
+        return buildResponse(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Request Content-Type is not supported for this endpoint");
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Map<String, Object>> handleTooLarge(MaxUploadSizeExceededException ex) {
-        return build(HttpStatus.PAYLOAD_TOO_LARGE, "File is too large (max 5MB)");
+        return buildResponse(HttpStatus.PAYLOAD_TOO_LARGE, "File is too large (max 5MB)");
     }
 
-    /** Safety net: log details server-side, return a generic message to the client. */
+    @ExceptionHandler(FileStorageException.class)
+    public ResponseEntity<Map<String, Object>> handleFileStorage(FileStorageException ex) {
+        log.error("File storage error: {}", ex.getMessage(), ex);
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGeneric(Exception ex) {
-        log.error("Unexpected error", ex);
-        return build(HttpStatus.INTERNAL_SERVER_ERROR, "Something went wrong. Please try again.");
+        log.error("Unhandled server exception: {}", ex.getMessage(), ex);
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred. Please try again.");
     }
 
-    private ResponseEntity<Map<String, Object>> build(HttpStatus status, String message) {
+    private ResponseEntity<Map<String, Object>> buildResponse(HttpStatus status, String message) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("timestamp", LocalDateTime.now());
         body.put("status", status.value());
@@ -60,4 +67,3 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(body);
     }
 }
-

@@ -1,11 +1,13 @@
 package com.atsresume.repository;
 
-import com.atsresume.entity.Resume;
+import com.atsresume.model.Resume;
 import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.stereotype.Repository;
 
 /**
- * Repository: Spring Data generates the implementation at runtime.
- * Inherits save, findById, findAll, deleteById, etc.; custom queries can be added later.
+ * Repository interface for MongoDB CRUD operations on Resume documents.
+ * Spring Data MongoDB generates the implementation dynamically at runtime.
  */
+@Repository
 public interface ResumeRepository extends MongoRepository<Resume, String> {
 }
