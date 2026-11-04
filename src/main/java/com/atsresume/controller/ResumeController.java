@@ -36,6 +36,7 @@ public class ResumeController {
      * POST /api/v1/resumes - Upload resume (PDF or DOCX file).
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+
     public ResponseEntity<Resume> uploadResume(@RequestPart("file") MultipartFile file) {
         Resume savedResume = resumeService.uploadResume(file);
         return ResponseEntity.status(HttpStatus.CREATED).body(savedResume);
@@ -45,6 +46,7 @@ public class ResumeController {
      * GET /api/v1/resumes - Retrieve all resumes.
      */
     @GetMapping
+
     public ResponseEntity<List<Resume>> getAllResumes() {
         return ResponseEntity.ok(resumeService.getAllResumes());
     }
@@ -53,6 +55,7 @@ public class ResumeController {
      * GET /api/v1/resumes/{id} - Retrieve a resume by its ID.
      */
     @GetMapping("/{id}")
+
     public ResponseEntity<Resume> getResumeById(@PathVariable String id) {
         return ResponseEntity.ok(resumeService.getResumeById(id));
     }
@@ -71,6 +74,7 @@ public class ResumeController {
      * PUT /api/v1/resumes/{id} - Update resume via multipart/form-data (optional file replacement or name update).
      */
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+
     public ResponseEntity<Resume> updateResumeMultipart(
             @PathVariable String id,
             @RequestParam(value = "fileName", required = false) String fileName,
@@ -80,7 +84,8 @@ public class ResumeController {
     }
 
     /**
-     * PUT /api/v1/resumes/{id} - Fallback for query parameters or default Content-Type.
+     * PUT /api/v1/resumes/{id} - Fallback for query parameters or default
+     * Content-Type.
      */
     @PutMapping(value = "/{id}")
     public ResponseEntity<Resume> updateResumeDefault(
@@ -95,6 +100,7 @@ public class ResumeController {
      * DELETE /api/v1/resumes/{id} - Delete resume record from MongoDB and local storage.
      */
     @DeleteMapping("/{id}")
+
     public ResponseEntity<Void> deleteResume(@PathVariable String id) {
         resumeService.deleteResume(id);
         return ResponseEntity.noContent().build();

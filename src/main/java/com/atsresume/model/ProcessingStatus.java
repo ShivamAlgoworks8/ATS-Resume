@@ -11,3 +11,4 @@ public enum ProcessingStatus {
     /** Text extraction failed (e.g. corrupted file or unreadable content) */
     FAILED
 }
+

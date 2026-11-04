@@ -14,7 +14,8 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 /**
- * Global Exception Handler providing standardized, beginner-friendly JSON error responses.
+ * Global Exception Handler providing standardized, beginner-friendly JSON error
+ * responses.
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -38,7 +39,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     public ResponseEntity<Map<String, Object>> handleMediaType(HttpMediaTypeNotSupportedException ex) {
-        return buildResponse(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Request Content-Type is not supported for this endpoint");
+        return buildResponse(HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+                "Request Content-Type is not supported for this endpoint");
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
@@ -57,6 +59,7 @@ public class GlobalExceptionHandler {
         log.error("Unhandled server exception: {}", ex.getMessage(), ex);
         return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred. Please try again.");
     }
+
 
     private ResponseEntity<Map<String, Object>> buildResponse(HttpStatus status, String message) {
         Map<String, Object> body = new LinkedHashMap<>();

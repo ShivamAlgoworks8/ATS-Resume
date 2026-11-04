@@ -35,3 +35,4 @@ public class ResumeUpdateRequest {
         this.fileName = fileName;
     }
 }
+

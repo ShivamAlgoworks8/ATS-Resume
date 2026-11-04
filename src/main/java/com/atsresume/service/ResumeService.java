@@ -26,7 +26,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 /**
  * Service class implementing business logic for resume management:
- * file validation, local disk storage, text extraction via Apache Tika, and MongoDB persistence.
+ * file validation, local disk storage, text extraction via Apache Tika, and
+ * MongoDB persistence.
  */
 @Service
 public class ResumeService {
@@ -46,6 +47,7 @@ public class ResumeService {
     private final Tika tika = new Tika();
     private final Path uploadDir;
 
+
     public ResumeService(ResumeRepository resumeRepository, @Value("${app.upload.dir:uploads}") String uploadDir) {
         this.resumeRepository = resumeRepository;
         this.uploadDir = Paths.get(uploadDir).toAbsolutePath().normalize();
@@ -57,7 +59,8 @@ public class ResumeService {
     }
 
     /**
-     * Uploads a new resume: validates file, stores it locally, extracts text with Tika, and saves metadata to MongoDB.
+     * Uploads a new resume: validates file, stores it locally, extracts text with
+     * Tika, and saves metadata to MongoDB.
      */
     public Resume uploadResume(MultipartFile file) {
         String extension = validateFile(file);
@@ -101,6 +104,7 @@ public class ResumeService {
     /**
      * Updates resume metadata (originalFileName or fileName) using DTO.
      */
+
     public Resume updateResumeMetadata(String id, ResumeUpdateRequest request) {
         Resume resume = getResumeById(id);
 
@@ -177,6 +181,7 @@ public class ResumeService {
 
     // ---------- Helper Methods ----------
 
+
     /**
      * Validates that the file is not empty, does not exceed size limit, has an allowed extension,
      * and that the actual file content matches the extension using Apache Tika.
@@ -223,6 +228,7 @@ public class ResumeService {
         return (lastSlash >= 0) ? cleaned.substring(lastSlash + 1) : cleaned;
     }
 
+
     /**
      * Stores the multipart file to local disk storage.
      */
@@ -233,6 +239,7 @@ public class ResumeService {
             throw new FileStorageException("Failed to store file on disk: " + storedFileName, e);
         }
     }
+
 
     /**
      * Deletes a stored file from local disk.
@@ -249,7 +256,8 @@ public class ResumeService {
     }
 
     /**
-     * Extracts text using Apache Tika. If file is corrupted or unreadable, marks status as FAILED.
+     * Extracts text using Apache Tika. If file is corrupted or unreadable, marks
+     * status as FAILED.
      */
     private void extractText(Resume resume) {
         try {

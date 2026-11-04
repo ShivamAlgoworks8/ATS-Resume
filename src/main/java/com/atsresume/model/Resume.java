@@ -114,3 +114,4 @@ public class Resume {
         this.processingStatus = processingStatus;
     }
 }
+
