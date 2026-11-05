@@ -1,0 +1,14 @@
+<aside class="sidebar">
+  <a class="brand" routerLink="/dashboard">
+    <span class="brand-mark"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 2 37 11.5v17L20 38 3 28.5v-17L20 2Z"/><path d="m3.5 11.7 16.5 9.5 16.5-9.5M20 21.5V38"/></svg></span>
+    <span>ATS Resume<br><b>Maker</b></span>
+  </a>
+  <div class="side-rule"></div>
+  <nav class="nav-list" aria-label="Main navigation">
+    @for (item of links; track item.path) {
+      <a class="nav-item" [routerLink]="item.path" routerLinkActive="active"><span class="nav-icon">{{ item.icon }}</span><span>{{ item.label }}</span></a>
+    }
+  </nav>
+  <div class="side-promo"><div class="promo-rocket">✦</div><h3>Build<br>ATS-Ready Resume</h3><p><span>✓</span> Analyze your resume</p><p><span>✓</span> Get ATS score</p><p><span>✓</span> Generate optimized resume</p><a routerLink="/create-resume" aria-label="Create your resume">→</a></div>
+  <div class="side-footer"><div class="avatar">JD</div><span><b>Jordan Davis</b><small>Free plan</small></span><span class="more">···</span></div>
+</aside>

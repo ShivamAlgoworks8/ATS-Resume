@@ -1,0 +1,94 @@
+<section class="content library-page">
+        <div class="page-title-row">
+          <div>
+            <div class="eyebrow"><span class="sparkle">✦</span> YOUR CAREER TOOLKIT</div>
+            <h1>My resumes</h1>
+            <p>Keep every version organized and ready for your next opportunity.</p>
+          </div>
+          <button class="primary-button" routerLink="/create-resume">
+            ＋ Create a resume
+          </button>
+        </div>
+        <div class="library-stats">
+          <div class="stat-card">
+            <span class="stat-icon purple-soft">▤</span
+            ><span><small>Total resumes</small><b>4</b></span
+            ><span class="stat-note">Across 3 roles</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-icon green-soft">◎</span
+            ><span
+              ><small>Average ATS score</small
+              ><b>76<span class="small-percent"> / 100</span></b></span
+            ><span class="stat-note positive">↑ 8% this month</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-icon blue-soft">↗</span
+            ><span><small>Applications sent</small><b>12</b></span
+            ><span class="stat-note">This month</span>
+          </div>
+        </div>
+        <section class="panel library-panel">
+          <div class="library-panel-heading">
+            <div>
+              <h2>All resumes</h2>
+              <p>Manage and tailor a resume for every role.</p>
+            </div>
+            <div class="library-filters">
+              <button (click)="toastService.show('Showing all resumes')">All resumes⌄</button
+              ><button class="search-button" (click)="toastService.show('Search your resumes')">
+                ⌕ <span>Search resumes</span>
+              </button>
+            </div>
+          </div>
+          <div class="resume-list">
+            <div class="resume-item">
+              <span class="resume-doc-icon">PDF</span>
+              <div class="resume-name">
+                <b>Senior Software Engineer</b><small>Updated Jan 26, 2025 · 2 pages</small>
+              </div>
+              <span class="resume-tag">Software engineering</span>
+              <div class="resume-score"><b>82</b><small>ATS score</small></div>
+              <button class="row-menu" (click)="toastService.show('Resume options opened')">···</button>
+            </div>
+            <div class="resume-item">
+              <span class="resume-doc-icon docx">DOC</span>
+              <div class="resume-name">
+                <b>Full Stack Developer</b><small>Updated Jan 22, 2025 · 2 pages</small>
+              </div>
+              <span class="resume-tag">Full stack</span>
+              <div class="resume-score"><b>76</b><small>ATS score</small></div>
+              <button class="row-menu" (click)="toastService.show('Resume options opened')">···</button>
+            </div>
+            <div class="resume-item">
+              <span class="resume-doc-icon">PDF</span>
+              <div class="resume-name">
+                <b>Backend Engineer</b><small>Updated Jan 18, 2025 · 1 page</small>
+              </div>
+              <span class="resume-tag">Backend</span>
+              <div class="resume-score"><b>71</b><small>ATS score</small></div>
+              <button class="row-menu" (click)="toastService.show('Resume options opened')">···</button>
+            </div>
+            <div class="resume-item">
+              <span class="resume-doc-icon docx">DOC</span>
+              <div class="resume-name">
+                <b>Java Developer — General</b><small>Updated Jan 12, 2025 · 2 pages</small>
+              </div>
+              <span class="resume-tag">Software engineering</span>
+              <div class="resume-score"><b>68</b><small>ATS score</small></div>
+              <button class="row-menu" (click)="toastService.show('Resume options opened')">···</button>
+            </div>
+          </div>
+          <div class="table-foot">
+            Showing 4 of 4 resumes <span>Last updated · newest first</span>
+          </div>
+        </section>
+        <div class="resume-tip">
+          <span>✧</span>
+          <div>
+            <b>Tailor your resume for every application</b>
+            <p>A role-specific resume helps recruiters see your experience in context.</p>
+          </div>
+          <button routerLink="/create-resume">Check my ATS score →</button>
+        </div>
+      </section>

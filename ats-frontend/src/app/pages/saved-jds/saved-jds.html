@@ -1,0 +1,87 @@
+<section class="content library-page">
+        <div class="page-title-row">
+          <div>
+            <div class="eyebrow"><span class="sparkle">✦</span> OPPORTUNITIES WORTH SAVING</div>
+            <h1>Saved job descriptions</h1>
+            <p>Keep the roles you love close and tailor your next application.</p>
+          </div>
+          <button
+            class="primary-button"
+            (click)="toastService.show('Paste a job description on the Create Resume page to save a role.')"
+          >
+            ＋ Save a job
+          </button>
+        </div>
+        <div class="saved-toolbar">
+          <span><b>8 roles</b> saved for later</span
+          ><button class="search-button" (click)="toastService.show('Search your saved roles')">
+            ⌕ <span>Search saved roles</span>
+          </button>
+        </div>
+        <div class="saved-grid">
+          <article class="panel saved-card">
+            <div class="saved-card-top">
+              <span class="company-mark company-purple">A</span
+              ><button class="row-menu" (click)="toastService.show('Job options opened')">···</button>
+            </div>
+            <span class="job-type">FULL TIME <i>·</i> HYBRID</span>
+            <h2>Senior Software Engineer</h2>
+            <p class="company-name">Acme Technologies <span>·</span> San Francisco, CA</p>
+            <div class="job-tags">
+              <span>Java</span><span>Spring Boot</span><span>REST APIs</span><span>+ 5</span>
+            </div>
+            <div class="job-card-foot">
+              <span>Saved Jan 26, 2025</span
+              ><button routerLink="/create-resume">Tailor resume →</button>
+            </div>
+          </article>
+          <article class="panel saved-card">
+            <div class="saved-card-top">
+              <span class="company-mark company-blue">N</span
+              ><button class="row-menu" (click)="toastService.show('Job options opened')">···</button>
+            </div>
+            <span class="job-type">FULL TIME <i>·</i> REMOTE</span>
+            <h2>Full Stack Developer</h2>
+            <p class="company-name">Northstar Labs <span>·</span> Remote, US</p>
+            <div class="job-tags">
+              <span>React</span><span>Node.js</span><span>TypeScript</span><span>+ 3</span>
+            </div>
+            <div class="job-card-foot">
+              <span>Saved Jan 22, 2025</span
+              ><button routerLink="/create-resume">Tailor resume →</button>
+            </div>
+          </article>
+          <article class="panel saved-card">
+            <div class="saved-card-top">
+              <span class="company-mark company-orange">L</span
+              ><button class="row-menu" (click)="toastService.show('Job options opened')">···</button>
+            </div>
+            <span class="job-type">FULL TIME <i>·</i> ON-SITE</span>
+            <h2>Backend Engineer</h2>
+            <p class="company-name">Linear Systems <span>·</span> New York, NY</p>
+            <div class="job-tags">
+              <span>Python</span><span>PostgreSQL</span><span>Docker</span><span>+ 4</span>
+            </div>
+            <div class="job-card-foot">
+              <span>Saved Jan 18, 2025</span
+              ><button routerLink="/create-resume">Tailor resume →</button>
+            </div>
+          </article>
+          <article class="panel saved-card">
+            <div class="saved-card-top">
+              <span class="company-mark company-green">V</span
+              ><button class="row-menu" (click)="toastService.show('Job options opened')">···</button>
+            </div>
+            <span class="job-type">FULL TIME <i>·</i> HYBRID</span>
+            <h2>Java Developer</h2>
+            <p class="company-name">Vertex Digital <span>·</span> Austin, TX</p>
+            <div class="job-tags">
+              <span>Java</span><span>Microservices</span><span>AWS</span><span>+ 2</span>
+            </div>
+            <div class="job-card-foot">
+              <span>Saved Jan 12, 2025</span
+              ><button routerLink="/create-resume">Tailor resume →</button>
+            </div>
+          </article>
+        </div>
+      </section>
