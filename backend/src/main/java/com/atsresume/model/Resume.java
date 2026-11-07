@@ -5,40 +5,23 @@ import java.time.LocalDateTime;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-/**
- * Model: represents a resume stored in the "resumes" MongoDB collection.
- * Holds resume metadata, local storage reference, and extracted plain text.
- */
 @Document(collection = "resumes")
 public class Resume {
 
-    /** Unique MongoDB document identifier */
     @Id
     private String id;
 
-    /** Original name of the uploaded file (e.g. "my_resume.pdf") */
     private String originalFileName;
-
-    /** Editable file name shown through the API. */
     private String fileName;
 
-    /** Private disk storage key. Kept separate from editable API file names. */
+    // Internal disk key, kept separate from editable display names
     @JsonIgnore
     private String storageFileName;
 
-    /** File extension / format: "pdf" or "docx" */
     private String fileType;
-
-    /** File size in bytes */
     private long fileSize;
-
-    /** Plain text extracted from the document using Apache Tika */
     private String extractedText;
-
-    /** Timestamp when the resume was uploaded or updated */
     private LocalDateTime uploadDate;
-
-    /** Processing status: PENDING, COMPLETED, or FAILED */
     private ProcessingStatus processingStatus;
 
     public Resume() {
@@ -129,4 +112,3 @@ public class Resume {
         this.processingStatus = processingStatus;
     }
 }
-

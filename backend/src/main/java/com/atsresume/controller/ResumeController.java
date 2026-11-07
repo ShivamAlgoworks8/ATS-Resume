@@ -19,9 +19,6 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-/**
- * REST Controller exposing resume management endpoints under /api/v1/resumes.
- */
 @RestController
 @RequestMapping("/api/v1/resumes")
 public class ResumeController {
@@ -32,37 +29,22 @@ public class ResumeController {
         this.resumeService = resumeService;
     }
 
-    /**
-     * POST /api/v1/resumes - Upload resume (PDF or DOCX file).
-     */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-
     public ResponseEntity<Resume> uploadResume(@RequestPart("file") MultipartFile file) {
         Resume savedResume = resumeService.uploadResume(file);
         return ResponseEntity.status(HttpStatus.CREATED).body(savedResume);
     }
 
-    /**
-     * GET /api/v1/resumes - Retrieve all resumes.
-     */
     @GetMapping
-
     public ResponseEntity<List<Resume>> getAllResumes() {
         return ResponseEntity.ok(resumeService.getAllResumes());
     }
 
-    /**
-     * GET /api/v1/resumes/{id} - Retrieve a resume by its ID.
-     */
     @GetMapping("/{id}")
-
     public ResponseEntity<Resume> getResumeById(@PathVariable String id) {
         return ResponseEntity.ok(resumeService.getResumeById(id));
     }
 
-    /**
-     * PUT /api/v1/resumes/{id} - Update resume metadata via JSON body.
-     */
     @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Resume> updateResumeMetadataJson(
             @PathVariable String id,
@@ -70,11 +52,7 @@ public class ResumeController {
         return ResponseEntity.ok(resumeService.updateResumeMetadata(id, updateRequest));
     }
 
-    /**
-     * PUT /api/v1/resumes/{id} - Update resume via multipart/form-data (optional file replacement or name update).
-     */
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-
     public ResponseEntity<Resume> updateResumeMultipart(
             @PathVariable String id,
             @RequestParam(value = "fileName", required = false) String fileName,
@@ -83,10 +61,7 @@ public class ResumeController {
         return ResponseEntity.ok(resumeService.updateResume(id, fileName, originalFileName, file));
     }
 
-    /**
-     * PUT /api/v1/resumes/{id} - Fallback for query parameters or default
-     * Content-Type.
-     */
+    // Fallback when caller passes query params without JSON or multipart Content-Type
     @PutMapping(value = "/{id}")
     public ResponseEntity<Resume> updateResumeDefault(
             @PathVariable String id,
@@ -96,11 +71,7 @@ public class ResumeController {
         return ResponseEntity.ok(resumeService.updateResumeMetadata(id, request));
     }
 
-    /**
-     * DELETE /api/v1/resumes/{id} - Delete resume record from MongoDB and local storage.
-     */
     @DeleteMapping("/{id}")
-
     public ResponseEntity<Void> deleteResume(@PathVariable String id) {
         resumeService.deleteResume(id);
         return ResponseEntity.noContent().build();

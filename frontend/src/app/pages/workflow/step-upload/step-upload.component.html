@@ -1,0 +1,251 @@
+<div class="dashboard-page">
+  <div class="page-intro-bar">
+    <div>
+      <h1 class="page-main-title">Resume Analyzer</h1>
+      <p class="page-main-subtitle">
+        Upload your resume (PDF or DOCX) and provide the target Job Description to calculate your ATS compatibility score and identify missing skills.
+      </p>
+    </div>
+  </div>
+
+  @if (uploadError()) {
+    <div class="alert-banner alert-error" role="alert">
+      <div>
+        <strong>Resume Upload Error:</strong> {{ uploadError() }}
+      </div>
+      <button type="button" class="alert-close-btn" (click)="uploadError.set(null)">✕</button>
+    </div>
+  }
+
+  @if (jdValidationError()) {
+    <div class="alert-banner alert-error" role="alert">
+      <div>
+        <strong>Job Description Notice:</strong> {{ jdValidationError() }}
+      </div>
+      <button type="button" class="alert-close-btn" (click)="jdValidationError.set(null)">✕</button>
+    </div>
+  }
+
+  <div class="upload-workflow-grid">
+    <section class="card upload-panel-card">
+      <div class="panel-header-row">
+        <div>
+          <h2 class="card-title">Upload Resume</h2>
+          <p class="card-subtitle">Supported formats: PDF and DOCX (max 5 MB)</p>
+        </div>
+        <span class="badge-pill badge-green">PDF / DOCX</span>
+      </div>
+
+      <label
+        class="upload-dropzone"
+        [class.dragging]="draggingResume()"
+        [class.has-file]="state.hasUploadedResume()"
+        for="resume-upload-input"
+        (dragover)="onResumeDragOver($event)"
+        (dragleave)="onResumeDragLeave($event)"
+        (drop)="onResumeDrop($event)"
+      >
+        <span class="upload-svg-circle">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <path d="M14 2v6h6M12 18v-6m-3 3 3-3 3 3" />
+          </svg>
+        </span>
+        <h4>
+          @if (uploading()) {
+            Uploading &amp; parsing resume…
+          } @else if (state.hasUploadedResume()) {
+            Replace uploaded resume file
+          } @else {
+            Drag and drop your resume here, or click to browse
+          }
+        </h4>
+        <p>Accepts .pdf and .docx up to 5 MB</p>
+        <input
+          id="resume-upload-input"
+          class="hidden-file-input"
+          type="file"
+          accept=".pdf,.docx"
+          (change)="onResumeFileSelected($event)"
+        />
+      </label>
+
+      @if (state.activeResume(); as active) {
+        <div class="active-file-summary">
+          <div class="file-summary-top">
+            <span class="file-type-badge">
+              {{ active.fileType.toLowerCase() === 'docx' ? 'DOCX' : 'PDF' }}
+            </span>
+            <div class="file-summary-info" style="flex: 1">
+              <strong>{{ active.originalFileName || active.fileName }}</strong>
+              <small>{{ formatBytes(active.fileSize) }} · {{ active.processingStatus }}</small>
+            </div>
+            <div class="intro-actions">
+              <button
+                type="button"
+                class="btn-outline btn-xs"
+                (click)="showExtractedPreview.set(!showExtractedPreview())"
+              >
+                {{ showExtractedPreview() ? 'Hide Text' : 'Preview Text' }}
+              </button>
+              <button type="button" class="btn-text-danger" (click)="removeResume()">
+                Remove
+              </button>
+            </div>
+          </div>
+
+          @if (showExtractedPreview()) {
+            <div class="extracted-preview-box">
+              <div class="preview-box-header">
+                <span>Extracted Text</span>
+                <span>{{ active.extractedText ? active.extractedText.length + ' chars' : 'No text' }}</span>
+              </div>
+              <pre class="extracted-text-snippet">{{ active.extractedText || 'No text extracted.' }}</pre>
+            </div>
+          }
+        </div>
+      }
+
+      @if (resumeApi.resumes().length > 0) {
+        <div class="existing-resumes-selector">
+          <div class="selector-header">
+            <span>Or select from your uploaded resumes</span>
+          </div>
+          <div class="saved-resumes-mini-list">
+            @for (item of resumeApi.resumes().slice(0, 3); track item.id) {
+              <div
+                class="saved-resume-row"
+                [class.selected]="state.activeResume()?.id === item.id"
+                (click)="selectExistingResume(item)"
+              >
+                <span class="file-type-badge">
+                  {{ item.fileType.toUpperCase() }}
+                </span>
+                <div class="saved-resume-meta">
+                  <strong>{{ item.originalFileName || item.fileName }}</strong>
+                  <small>{{ formatBytes(item.fileSize) }}</small>
+                </div>
+                <span class="use-pill">
+                  {{ state.activeResume()?.id === item.id ? 'Selected' : 'Select' }}
+                </span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </section>
+
+    <section class="card upload-panel-card">
+      <div class="panel-header-row">
+        <div>
+          <h2 class="card-title">Job Description</h2>
+          <p class="card-subtitle">Paste the target job description text or upload a file</p>
+        </div>
+      </div>
+
+      <div class="form-row-2col">
+        <div class="form-group">
+          <label for="job-title-input">Target Job Title (Optional)</label>
+          <input
+            id="job-title-input"
+            type="text"
+            class="form-input"
+            placeholder="e.g. Software Engineer"
+            [value]="state.jobTitle()"
+            (input)="updateJobTitle($event)"
+          />
+        </div>
+        <div class="form-group">
+          <label for="company-name-input">Company Name (Optional)</label>
+          <input
+            id="company-name-input"
+            type="text"
+            class="form-input"
+            placeholder="e.g. Company Name"
+            [value]="state.companyName()"
+            (input)="updateCompanyName($event)"
+          />
+        </div>
+      </div>
+
+      <div class="jd-mode-tabs">
+        <button
+          type="button"
+          class="mode-tab-btn"
+          [class.active]="state.jdInputMode() === 'paste'"
+          (click)="state.jdInputMode.set('paste')"
+        >
+          Paste Text
+        </button>
+        <button
+          type="button"
+          class="mode-tab-btn"
+          [class.active]="state.jdInputMode() === 'upload'"
+          (click)="state.jdInputMode.set('upload')"
+        >
+          Upload File
+        </button>
+      </div>
+
+      @if (state.jdInputMode() === 'paste') {
+        <div class="form-group">
+          <textarea
+            rows="8"
+            class="form-textarea"
+            aria-label="Job description"
+            placeholder="Paste the complete job description here, including required skills, qualifications, and responsibilities..."
+            [value]="state.jobDescription()"
+            (input)="updateJdText($event)"
+          ></textarea>
+          <div class="jd-textarea-meta">
+            <span>Minimum 20 characters required</span>
+            <span>{{ jdCharCount() }} / 5,000</span>
+          </div>
+        </div>
+      } @else {
+        <label
+          class="upload-dropzone jd-dropzone"
+          [class.dragging]="draggingJd()"
+          (dragover)="$event.preventDefault(); draggingJd.set(true)"
+          (dragleave)="$event.preventDefault(); draggingJd.set(false)"
+          (drop)="onJdDrop($event)"
+        >
+          <span class="upload-svg-circle">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <path d="M14 2v6h6M12 18v-6m-3 3 3-3 3 3" />
+            </svg>
+          </span>
+          <h4>{{ state.jdFileName() || 'Drop a Job Description file or click to browse' }}</h4>
+          <p>Supports TXT, PDF, or DOCX</p>
+          <input
+            class="hidden-file-input"
+            type="file"
+            accept=".txt,.pdf,.docx"
+            (change)="onJdFileSelected($event)"
+          />
+        </label>
+      }
+    </section>
+  </div>
+
+  <div class="card step-action-footer-card">
+    <div>
+      <div class="Checklist-item" [class.ready]="state.hasUploadedResume()">
+        {{ state.hasUploadedResume() ? '✓' : '○' }} Resume uploaded ({{ state.activeResume()?.originalFileName || 'None selected' }})
+      </div>
+      <div class="Checklist-item" [class.ready]="jdCharCount() >= 20">
+        {{ jdCharCount() >= 20 ? '✓' : '○' }} Job Description provided ({{ jdCharCount() }} characters)
+      </div>
+    </div>
+
+    <button
+      type="button"
+      class="btn-primary-action btn-hero-cta"
+      [disabled]="uploading() || state.analyzing()"
+      (click)="startAnalysis()"
+    >
+      {{ state.analyzing() ? 'Analyzing Resume…' : 'Analyze Resume' }}
+    </button>
+  </div>
+</div>

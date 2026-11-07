@@ -1,22 +1,42 @@
 import { Component, inject } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
 import { filter } from 'rxjs';
-import { ToastService } from '../../services/toast.service';
+import { ResumeApiService } from '../../services/resume.service';
 
 @Component({
   selector: 'app-topbar',
   standalone: true,
+  imports: [],
   templateUrl: './topbar.component.html',
 })
 export class TopbarComponent {
-  private readonly router = inject(Router);
-  readonly toast = inject(ToastService);
+  readonly resumeApi = inject(ResumeApiService);
   pageTitle = 'Dashboard';
 
+  private readonly routeNames: Record<string, string> = {
+    '/dashboard': 'Dashboard',
+    '/resume-analyzer': 'Resume Analyzer',
+    '/analysis-results': 'Analysis Results',
+    '/detailed-report': 'Detailed ATS Report',
+    '/resume-generator': 'Resume Generator',
+    '/my-analyses': 'My Analyses',
+    '/my-resumes': 'My Resumes',
+    '/templates': 'Templates',
+  };
+
   constructor() {
-    this.router.events.pipe(filter((event) => event instanceof NavigationEnd)).subscribe(() => {
-      const path = this.router.url.split('/')[1];
-      this.pageTitle = ({ dashboard: 'Dashboard', 'create-resume': 'Create Resume', 'my-resumes': 'My Resumes', 'analysis-history': 'Analysis History', 'saved-jds': 'Saved JDs' } as Record<string, string>)[path] ?? 'Dashboard';
-    });
+    const router = inject(Router);
+    this.updateTitle(router.url);
+
+    router.events
+      .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
+      .subscribe((event) => {
+        this.updateTitle(event.urlAfterRedirects);
+      });
+  }
+
+  private updateTitle(url: string): void {
+    const cleanUrl = url.split('?')[0].split('#')[0];
+    this.pageTitle = this.routeNames[cleanUrl] ?? 'Dashboard';
   }
 }

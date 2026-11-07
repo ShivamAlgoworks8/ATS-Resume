@@ -1,87 +1,116 @@
-<section class="content library-page">
-        <div class="page-title-row">
-          <div>
-            <div class="eyebrow"><span class="sparkle">✦</span> OPPORTUNITIES WORTH SAVING</div>
-            <h1>Saved job descriptions</h1>
-            <p>Keep the roles you love close and tailor your next application.</p>
+    <div class="dashboard-page">
+      <div class="page-intro-bar">
+        <div>
+          <span class="step-pill">TARGET JOB DESCRIPTIONS</span>
+          <h1 class="page-main-title">Saved Roles</h1>
+          <p class="page-main-subtitle">
+            Store target job descriptions and load them directly into the Resume Analyzer for keyword and role matching.
+          </p>
+        </div>
+        <div class="intro-actions">
+          <button type="button" class="btn-primary-action" (click)="showCreateModal.set(!showCreateModal())">
+            {{ showCreateModal() ? 'Cancel' : '+ Save Job Description' }}
+          </button>
+        </div>
+      </div>
+
+        @if (showCreateModal()) {
+        <div class="card">
+          <div class="panel-header-row">
+            <div>
+              <h2 class="card-title">Save New Job Description</h2>
+              <p class="card-subtitle">Add a target role to your library for repeatable ATS benchmarking</p>
+            </div>
           </div>
-          <button
-            class="primary-button"
-            (click)="toastService.show('Paste a job description on the Create Resume page to save a role.')"
-          >
-            ＋ Save a job
+
+          <div class="studio-form-grid cols-3">
+            <div class="form-group">
+              <label>Job Title *</label>
+              <input type="text" class="form-input" [ngModel]="newTitle()" (ngModelChange)="newTitle.set($event)"
+                placeholder="e.g., Senior Backend Engineer" />
+            </div>
+            <div class="form-group">
+              <label>Company Name *</label>
+              <input type="text" class="form-input" [ngModel]="newCompany()" (ngModelChange)="newCompany.set($event)"
+                placeholder="e.g., Stripe" />
+            </div>
+            <div class="form-group">
+              <label>Location</label>
+              <input type="text" class="form-input" [ngModel]="newLocation()" (ngModelChange)="newLocation.set($event)"
+                placeholder="e.g., Bengaluru / Remote" />
+            </div>
+          </div>
+
+          <div class="studio-form-grid cols-2">
+            <div class="form-group">
+              <label>Key Skills (Comma-Separated)</label>
+              <input type="text" class="form-input" [ngModel]="newKeySkillsInput()"
+                (ngModelChange)="newKeySkillsInput.set($event)"
+                placeholder="Java, Spring Boot, Microservices, Kafka, Docker" />
+            </div>
+            <div class="form-group">
+              <label>Work Mode</label>
+              <select class="form-input" [ngModel]="newWorkplaceType()" (ngModelChange)="newWorkplaceType.set($event)">
+                <option value="HYBRID">HYBRID</option>
+                <option value="REMOTE">REMOTE</option>
+                <option value="ON_SITE">ON-SITE</option>
+              </select>
+            </div>
+          </div>
+
+        <div class="form-group">
+          <label>Full Job Description Text *</label>
+          <textarea rows="5" class="form-textarea" [ngModel]="newDescription()"
+            (ngModelChange)="newDescription.set($event)"
+            placeholder="Paste the complete job requirements, responsibilities, and qualifications..."></textarea>
+        </div>
+
+        <div class="intro-actions">
+          <button type="button" class="btn-outline" (click)="showCreateModal.set(false)">Cancel</button>
+          <button type="button" class="btn-primary-action" (click)="saveNewJobDescription()">
+            Save Job Description
           </button>
         </div>
-        <div class="saved-toolbar">
-          <span><b>8 roles</b> saved for later</span
-          ><button class="search-button" (click)="toastService.show('Search your saved roles')">
-            ⌕ <span>Search saved roles</span>
-          </button>
+      </div>
+      }
+
+      <div class="saved-toolbar">
+        <span><b>{{ filteredJds().length }} roles</b> available for tailoring</span>
+        <div class="library-filters">
+          <input type="text" class="search-input" placeholder="Filter by title, company, or skill..."
+            [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" />
         </div>
-        <div class="saved-grid">
-          <article class="panel saved-card">
-            <div class="saved-card-top">
-              <span class="company-mark company-purple">A</span
-              ><button class="row-menu" (click)="toastService.show('Job options opened')">···</button>
-            </div>
-            <span class="job-type">FULL TIME <i>·</i> HYBRID</span>
-            <h2>Senior Software Engineer</h2>
-            <p class="company-name">Acme Technologies <span>·</span> San Francisco, CA</p>
-            <div class="job-tags">
-              <span>Java</span><span>Spring Boot</span><span>REST APIs</span><span>+ 5</span>
-            </div>
-            <div class="job-card-foot">
-              <span>Saved Jan 26, 2025</span
-              ><button routerLink="/create-resume">Tailor resume →</button>
-            </div>
-          </article>
-          <article class="panel saved-card">
-            <div class="saved-card-top">
-              <span class="company-mark company-blue">N</span
-              ><button class="row-menu" (click)="toastService.show('Job options opened')">···</button>
-            </div>
-            <span class="job-type">FULL TIME <i>·</i> REMOTE</span>
-            <h2>Full Stack Developer</h2>
-            <p class="company-name">Northstar Labs <span>·</span> Remote, US</p>
-            <div class="job-tags">
-              <span>React</span><span>Node.js</span><span>TypeScript</span><span>+ 3</span>
-            </div>
-            <div class="job-card-foot">
-              <span>Saved Jan 22, 2025</span
-              ><button routerLink="/create-resume">Tailor resume →</button>
-            </div>
-          </article>
-          <article class="panel saved-card">
-            <div class="saved-card-top">
-              <span class="company-mark company-orange">L</span
-              ><button class="row-menu" (click)="toastService.show('Job options opened')">···</button>
-            </div>
-            <span class="job-type">FULL TIME <i>·</i> ON-SITE</span>
-            <h2>Backend Engineer</h2>
-            <p class="company-name">Linear Systems <span>·</span> New York, NY</p>
-            <div class="job-tags">
-              <span>Python</span><span>PostgreSQL</span><span>Docker</span><span>+ 4</span>
-            </div>
-            <div class="job-card-foot">
-              <span>Saved Jan 18, 2025</span
-              ><button routerLink="/create-resume">Tailor resume →</button>
-            </div>
-          </article>
-          <article class="panel saved-card">
-            <div class="saved-card-top">
-              <span class="company-mark company-green">V</span
-              ><button class="row-menu" (click)="toastService.show('Job options opened')">···</button>
-            </div>
-            <span class="job-type">FULL TIME <i>·</i> HYBRID</span>
-            <h2>Java Developer</h2>
-            <p class="company-name">Vertex Digital <span>·</span> Austin, TX</p>
-            <div class="job-tags">
-              <span>Java</span><span>Microservices</span><span>AWS</span><span>+ 2</span>
-            </div>
-            <div class="job-card-foot">
-              <span>Saved Jan 12, 2025</span
-              ><button routerLink="/create-resume">Tailor resume →</button>
-            </div>
-          </article>
-        </div>
-      </section>
+      </div>
+
+      <div class="saved-grid">
+        @for (jd of filteredJds(); track jd.id) {
+        <article class="card saved-card">
+          <div class="saved-card-top">
+            <span class="company-mark">
+              {{ jd.company.charAt(0).toUpperCase() }}
+            </span>
+            <button type="button" class="btn-text-danger" title="Remove Saved JD" (click)="removeJd(jd.id, jd.title)">
+              Delete
+            </button>
+          </div>
+          <span class="job-type">{{ jd.employmentType }} · {{ jd.workplaceType }}</span>
+          <h2>{{ jd.title }}</h2>
+          <p class="company-name">{{ jd.company }} · {{ jd.location }}</p>
+          <div class="job-tags">
+            @for (skill of jd.keySkills.slice(0, 5); track skill) {
+            <span>{{ skill }}</span>
+            }
+            @if (jd.keySkills.length > 5) {
+            <span>+{{ jd.keySkills.length - 5 }}</span>
+            }
+          </div>
+          <div class="job-card-foot">
+            <span>Saved {{ jd.savedDate }}</span>
+            <button type="button" class="btn-outline btn-xs" (click)="tailorResumeForJd(jd)">
+              Tailor Resume →
+            </button>
+          </div>
+        </article>
+        }
+      </div>
+</div>
