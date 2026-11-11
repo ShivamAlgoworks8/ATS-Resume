@@ -1,0 +1,775 @@
+<div class="dashboard-page generator-page">
+  <div class="page-intro-bar no-print">
+    <div>
+      <h1 class="page-main-title">Resume Generator</h1>
+      <p class="page-main-subtitle">
+        Edit your resume sections on the left and preview your live ATS-friendly resume on the right.
+      </p>
+    </div>
+
+    <div class="intro-actions">
+      <div class="template-selector-group" role="group" aria-label="Select Resume Template">
+        @for (tpl of templates; track tpl.id) {
+          <button
+            type="button"
+            class="template-pill-btn"
+            [class.active]="state.selectedTemplate() === tpl.id"
+            (click)="selectTemplate(tpl.id)"
+          >
+            {{ tpl.name }}
+          </button>
+        }
+      </div>
+
+      <button type="button" class="btn-outline" (click)="downloadDocx()">
+        Download DOCX
+      </button>
+      <button
+        type="button"
+        class="btn-primary-action"
+        [disabled]="isExportingPdf()"
+        (click)="downloadPdf()"
+      >
+        {{ isExportingPdf() ? 'Generating PDF…' : 'Download PDF' }}
+      </button>
+    </div>
+  </div>
+
+  @if (studioFeedbackBanner()) {
+    <div class="alert-banner alert-success no-print">
+      <span>✓ {{ studioFeedbackBanner() }}</span>
+      <button type="button" class="alert-close-btn" (click)="studioFeedbackBanner.set(null)">✕</button>
+    </div>
+  }
+
+  <div class="studio-nav-bar no-print">
+    <div class="category-filter-bar">
+      <button
+        type="button"
+        class="cat-filter-pill"
+        [class.active]="activeSectionTab() === 'ALL'"
+        (click)="activeSectionTab.set('ALL')"
+      >
+        All Sections
+      </button>
+      <button
+        type="button"
+        class="cat-filter-pill"
+        [class.active]="activeSectionTab() === 'CONTACT'"
+        (click)="activeSectionTab.set('CONTACT')"
+      >
+        Personal Information
+      </button>
+      <button
+        type="button"
+        class="cat-filter-pill"
+        [class.active]="activeSectionTab() === 'SUMMARY'"
+        (click)="activeSectionTab.set('SUMMARY')"
+      >
+        Summary
+      </button>
+      <button
+        type="button"
+        class="cat-filter-pill"
+        [class.active]="activeSectionTab() === 'SKILLS'"
+        (click)="activeSectionTab.set('SKILLS')"
+      >
+        Skills
+      </button>
+      <button
+        type="button"
+        class="cat-filter-pill"
+        [class.active]="activeSectionTab() === 'EXPERIENCE'"
+        (click)="activeSectionTab.set('EXPERIENCE')"
+      >
+        Work Experience
+      </button>
+      <button
+        type="button"
+        class="cat-filter-pill"
+        [class.active]="activeSectionTab() === 'PROJECTS'"
+        (click)="activeSectionTab.set('PROJECTS')"
+      >
+        Projects
+      </button>
+      <button
+        type="button"
+        class="cat-filter-pill"
+        [class.active]="activeSectionTab() === 'EDUCATION'"
+        (click)="activeSectionTab.set('EDUCATION')"
+      >
+        Education
+      </button>
+    </div>
+  </div>
+
+  <div class="generator-split-layout">
+    <div class="generator-editor-panel no-print">
+      @if (activeSectionTab() === 'ALL' || activeSectionTab() === 'CONTACT') {
+        <div class="card studio-section-card">
+          <div class="studio-card-header">
+            <div>
+              <h2 class="card-title">Personal Information</h2>
+              <p class="card-subtitle">Contact details and profile links</p>
+            </div>
+          </div>
+
+          <div class="studio-form-grid cols-2">
+            <div class="form-group">
+              <label>Full Name</label>
+              <input
+                type="text"
+                class="form-input"
+                [ngModel]="state.editableStructured().contact.fullName"
+                (ngModelChange)="updateContactField('fullName', $event)"
+                placeholder="Full Name"
+              />
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input
+                type="email"
+                class="form-input"
+                [ngModel]="state.editableStructured().contact.email"
+                (ngModelChange)="updateContactField('email', $event)"
+                placeholder="email@example.com"
+              />
+            </div>
+            <div class="form-group">
+              <label>Phone</label>
+              <input
+                type="text"
+                class="form-input"
+                [ngModel]="state.editableStructured().contact.phone"
+                (ngModelChange)="updateContactField('phone', $event)"
+                placeholder="+91 98765 43210"
+              />
+            </div>
+            <div class="form-group">
+              <label>Location</label>
+              <input
+                type="text"
+                class="form-input"
+                [ngModel]="state.editableStructured().contact.location"
+                (ngModelChange)="updateContactField('location', $event)"
+                placeholder="City, Country"
+              />
+            </div>
+            <div class="form-group">
+              <label>LinkedIn</label>
+              <input
+                type="text"
+                class="form-input"
+                [ngModel]="state.editableStructured().contact.linkedin"
+                (ngModelChange)="updateContactField('linkedin', $event)"
+                placeholder="linkedin.com/in/username"
+              />
+            </div>
+            <div class="form-group">
+              <label>GitHub / Portfolio</label>
+              <input
+                type="text"
+                class="form-input"
+                [ngModel]="state.editableStructured().contact.github"
+                (ngModelChange)="updateContactField('github', $event)"
+                placeholder="github.com/username"
+              />
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (activeSectionTab() === 'ALL' || activeSectionTab() === 'SUMMARY') {
+        <div class="card studio-section-card">
+          <div class="studio-card-header">
+            <div>
+              <h2 class="card-title">Summary</h2>
+              <p class="card-subtitle">Professional summary aligned with your target role</p>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <textarea
+              rows="4"
+              class="form-textarea"
+              [ngModel]="state.editableStructured().professionalSummary"
+              (ngModelChange)="updateSummaryText($event)"
+              placeholder="Write a concise professional summary..."
+            ></textarea>
+          </div>
+        </div>
+      }
+
+      @if (activeSectionTab() === 'ALL' || activeSectionTab() === 'SKILLS') {
+        <div class="card studio-section-card">
+          <div class="studio-card-header">
+            <div>
+              <h2 class="card-title">Skills</h2>
+              <p class="card-subtitle">Add, edit, or remove skills</p>
+            </div>
+          </div>
+
+          <div class="skills-categories-list">
+            @for (cat of state.editableStructured().skillCategories; track cat.id) {
+              <div class="skill-category-block">
+                <div class="skill-cat-header">
+                  <input
+                    type="text"
+                    class="skill-cat-title-input"
+                    [ngModel]="cat.categoryName"
+                    (ngModelChange)="updateCategoryTitle(cat.id, $event)"
+                    placeholder="Category Name"
+                  />
+                  <button
+                    type="button"
+                    class="btn-text-danger"
+                    (click)="removeSkillCategory(cat.id)"
+                  >
+                    Remove Group
+                  </button>
+                </div>
+
+                <div class="editable-skill-chips">
+                  @for (skill of cat.skills; track $index) {
+                    @if (editingSkillKey() === cat.id + ':' + $index) {
+                      <div class="skill-inline-editor">
+                        <input
+                          type="text"
+                          class="skill-inline-input"
+                          [ngModel]="editingSkillValue()"
+                          (ngModelChange)="editingSkillValue.set($event)"
+                          (keyup.enter)="saveEditedSkill(cat.id, $index)"
+                        />
+                        <button
+                          type="button"
+                          class="btn-outline btn-xs"
+                          (click)="saveEditedSkill(cat.id, $index)"
+                        >
+                          ✓
+                        </button>
+                      </div>
+                    } @else {
+                      <span class="studio-skill-chip">
+                        <span
+                          class="skill-chip-text"
+                          (click)="startEditSkill(cat.id, $index, skill)"
+                        >
+                          {{ skill }}
+                        </span>
+                        <button
+                          type="button"
+                          class="skill-chip-remove"
+                          (click)="removeSkillFromCategory(cat.id, $index)"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    }
+                  } @empty {
+                    <span class="empty-note">No skills added yet.</span>
+                  }
+                </div>
+
+                <div class="add-skill-inline-row">
+                  <input
+                    type="text"
+                    class="form-input form-input-sm"
+                    [ngModel]="getNewSkillInput(cat.id)"
+                    (ngModelChange)="setNewSkillInput(cat.id, $event)"
+                    (keyup.enter)="addSkillToCategory(cat.id)"
+                    placeholder="Add skill (press Enter)..."
+                  />
+                  <button
+                    type="button"
+                    class="btn-outline btn-sm"
+                    (click)="addSkillToCategory(cat.id)"
+                  >
+                    + Add
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="add-category-row">
+            <input
+              type="text"
+              class="form-input form-input-sm"
+              [ngModel]="newSkillCategoryName()"
+              (ngModelChange)="newSkillCategoryName.set($event)"
+              (keyup.enter)="addSkillCategory()"
+              placeholder="New skill category..."
+            />
+            <button type="button" class="btn-outline btn-sm" (click)="addSkillCategory()">
+              + Add Category
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (activeSectionTab() === 'ALL' || activeSectionTab() === 'EXPERIENCE') {
+        <div class="card studio-section-card">
+          <div class="studio-card-header">
+            <div>
+              <h2 class="card-title">Work Experience</h2>
+              <p class="card-subtitle">Roles, companies, dates, and bullet points</p>
+            </div>
+            <button type="button" class="btn-outline btn-sm" (click)="addExperienceEntry()">
+              + Add Role
+            </button>
+          </div>
+
+          <div class="entries-stack">
+            @for (exp of state.editableStructured().experience; track exp.id) {
+              <div class="studio-entry-box">
+                <div class="entry-top-bar">
+                  <strong>{{ exp.jobTitle || 'Role Title' }} — {{ exp.company || 'Company' }}</strong>
+                  <button
+                    type="button"
+                    class="btn-text-danger"
+                    (click)="removeExperienceEntry(exp.id)"
+                  >
+                    Remove
+                  </button>
+                </div>
+
+                <div class="studio-form-grid cols-2">
+                  <div class="form-group">
+                    <label>Job Title</label>
+                    <input
+                      type="text"
+                      class="form-input"
+                      [ngModel]="exp.jobTitle"
+                      (ngModelChange)="updateExperienceField(exp.id, 'jobTitle', $event)"
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label>Company</label>
+                    <input
+                      type="text"
+                      class="form-input"
+                      [ngModel]="exp.company"
+                      (ngModelChange)="updateExperienceField(exp.id, 'company', $event)"
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label>Location</label>
+                    <input
+                      type="text"
+                      class="form-input"
+                      [ngModel]="exp.location"
+                      (ngModelChange)="updateExperienceField(exp.id, 'location', $event)"
+                    />
+                  </div>
+                  <div class="form-group date-pair-group">
+                    <div>
+                      <label>Start Date</label>
+                      <input
+                        type="text"
+                        class="form-input"
+                        [ngModel]="exp.startDate"
+                        (ngModelChange)="updateExperienceField(exp.id, 'startDate', $event)"
+                      />
+                    </div>
+                    <div>
+                      <label>End Date</label>
+                      <input
+                        type="text"
+                        class="form-input"
+                        [ngModel]="exp.endDate"
+                        (ngModelChange)="updateExperienceField(exp.id, 'endDate', $event)"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div class="bullets-editor-block">
+                  <label class="bullets-label">Bullet Points</label>
+                  @for (bullet of exp.bullets; track $index) {
+                    <div class="bullet-edit-row">
+                      <span class="bullet-dot">•</span>
+                      <textarea
+                        rows="2"
+                        class="form-textarea bullet-textarea"
+                        [ngModel]="bullet"
+                        (ngModelChange)="updateExperienceBullet(exp.id, $index, $event)"
+                      ></textarea>
+                      <button
+                        type="button"
+                        class="bullet-remove-btn"
+                        [disabled]="exp.bullets.length <= 1"
+                        (click)="removeExperienceBullet(exp.id, $index)"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  }
+                  <button
+                    type="button"
+                    class="btn-outline btn-xs"
+                    (click)="addExperienceBullet(exp.id)"
+                  >
+                    + Add Bullet
+                  </button>
+                </div>
+              </div>
+            } @empty {
+              <p class="empty-note">No work experience entries added yet.</p>
+            }
+          </div>
+        </div>
+      }
+
+      @if (activeSectionTab() === 'ALL' || activeSectionTab() === 'PROJECTS') {
+        <div class="card studio-section-card">
+          <div class="studio-card-header">
+            <div>
+              <h2 class="card-title">Projects</h2>
+              <p class="card-subtitle">Key projects, technologies, and highlights</p>
+            </div>
+            <button type="button" class="btn-outline btn-sm" (click)="addProjectEntry()">
+              + Add Project
+            </button>
+          </div>
+
+          <div class="entries-stack">
+            @for (proj of state.editableStructured().projects; track proj.id) {
+              <div class="studio-entry-box">
+                <div class="entry-top-bar">
+                  <strong>{{ proj.title || 'Project Title' }}</strong>
+                  <button
+                    type="button"
+                    class="btn-text-danger"
+                    (click)="removeProjectEntry(proj.id)"
+                  >
+                    Remove
+                  </button>
+                </div>
+
+                <div class="studio-form-grid cols-2">
+                  <div class="form-group">
+                    <label>Project Title</label>
+                    <input
+                      type="text"
+                      class="form-input"
+                      [ngModel]="proj.title"
+                      (ngModelChange)="updateProjectField(proj.id, 'title', $event)"
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label>Technologies</label>
+                    <input
+                      type="text"
+                      class="form-input"
+                      [ngModel]="proj.technologies"
+                      (ngModelChange)="updateProjectField(proj.id, 'technologies', $event)"
+                    />
+                  </div>
+                  <div class="form-group" style="grid-column: 1 / -1">
+                    <label>Project Link</label>
+                    <input
+                      type="text"
+                      class="form-input"
+                      [ngModel]="proj.link"
+                      (ngModelChange)="updateProjectField(proj.id, 'link', $event)"
+                    />
+                  </div>
+                </div>
+
+                <div class="bullets-editor-block">
+                  <label class="bullets-label">Bullet Points</label>
+                  @for (bullet of proj.bullets; track $index) {
+                    <div class="bullet-edit-row">
+                      <span class="bullet-dot">•</span>
+                      <textarea
+                        rows="2"
+                        class="form-textarea bullet-textarea"
+                        [ngModel]="bullet"
+                        (ngModelChange)="updateProjectBullet(proj.id, $index, $event)"
+                      ></textarea>
+                      <button
+                        type="button"
+                        class="bullet-remove-btn"
+                        [disabled]="proj.bullets.length <= 1"
+                        (click)="removeProjectBullet(proj.id, $index)"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  }
+                  <button
+                    type="button"
+                    class="btn-outline btn-xs"
+                    (click)="addProjectBullet(proj.id)"
+                  >
+                    + Add Bullet
+                  </button>
+                </div>
+              </div>
+            } @empty {
+              <p class="empty-note">No project entries added yet.</p>
+            }
+          </div>
+        </div>
+      }
+
+      @if (activeSectionTab() === 'ALL' || activeSectionTab() === 'EDUCATION') {
+        <div class="card studio-section-card">
+          <div class="studio-card-header">
+            <div>
+              <h2 class="card-title">Education</h2>
+              <p class="card-subtitle">Degrees, institutions, and graduation years</p>
+            </div>
+            <button type="button" class="btn-outline btn-sm" (click)="addEducationEntry()">
+              + Add Education
+            </button>
+          </div>
+
+          <div class="entries-stack">
+            @for (edu of state.editableStructured().education; track edu.id) {
+              <div class="studio-entry-box">
+                <div class="entry-top-bar">
+                  <strong>{{ edu.degree || 'Degree' }} — {{ edu.institution || 'Institution' }}</strong>
+                  <button
+                    type="button"
+                    class="btn-text-danger"
+                    (click)="removeEducationEntry(edu.id)"
+                  >
+                    Remove
+                  </button>
+                </div>
+
+                <div class="studio-form-grid cols-2">
+                  <div class="form-group">
+                    <label>Degree</label>
+                    <input
+                      type="text"
+                      class="form-input"
+                      [ngModel]="edu.degree"
+                      (ngModelChange)="updateEducationField(edu.id, 'degree', $event)"
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label>Field of Study</label>
+                    <input
+                      type="text"
+                      class="form-input"
+                      [ngModel]="edu.fieldOfStudy"
+                      (ngModelChange)="updateEducationField(edu.id, 'fieldOfStudy', $event)"
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label>Institution</label>
+                    <input
+                      type="text"
+                      class="form-input"
+                      [ngModel]="edu.institution"
+                      (ngModelChange)="updateEducationField(edu.id, 'institution', $event)"
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label>Graduation Year</label>
+                    <input
+                      type="text"
+                      class="form-input"
+                      [ngModel]="edu.endDate"
+                      (ngModelChange)="updateEducationField(edu.id, 'endDate', $event)"
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label>Location</label>
+                    <input
+                      type="text"
+                      class="form-input"
+                      [ngModel]="edu.location"
+                      (ngModelChange)="updateEducationField(edu.id, 'location', $event)"
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label>GPA / Honors</label>
+                    <input
+                      type="text"
+                      class="form-input"
+                      [ngModel]="edu.gradeOrHonors"
+                      (ngModelChange)="updateEducationField(edu.id, 'gradeOrHonors', $event)"
+                    />
+                  </div>
+                </div>
+              </div>
+            } @empty {
+              <p class="empty-note">No education entries added yet.</p>
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    <div class="generator-preview-panel">
+      <div class="live-preview-sticky-box">
+        <div class="live-preview-header no-print">
+          <div class="preview-header-left">
+            <span class="live-dot"></span>
+            <strong>Live Resume Preview</strong>
+            <span class="preview-template-badge">
+              {{
+                state.selectedTemplate() === 'classic-ats'
+                  ? 'Classic ATS'
+                  : state.selectedTemplate() === 'modern-executive'
+                    ? 'Modern Executive'
+                    : 'Compact Technical'
+              }}
+            </span>
+          </div>
+          <div class="preview-header-actions">
+            <button type="button" class="btn-outline btn-xs" (click)="downloadDocx()">DOCX</button>
+            <button type="button" class="btn-primary-action btn-xs" (click)="downloadPdf()">PDF</button>
+          </div>
+        </div>
+
+        <div class="latex-paper-container live-preview-paper-wrap">
+          <article
+            class="latex-paper-sheet"
+            [class.template-classic-ats]="state.selectedTemplate() === 'classic-ats'"
+            [class.template-modern-executive]="state.selectedTemplate() === 'modern-executive'"
+            [class.template-compact-technical]="state.selectedTemplate() === 'compact-technical'"
+            aria-label="Live Resume Preview"
+          >
+            <header class="latex-header">
+              <h1 class="latex-name">
+                {{ state.editableStructured().contact.fullName || 'YOUR FULL NAME' }}
+              </h1>
+              <div class="latex-contact-line">
+                @if (state.editableStructured().contact.location) {
+                  <span>{{ state.editableStructured().contact.location }}</span>
+                }
+                @if (state.editableStructured().contact.email) {
+                  <span>| {{ state.editableStructured().contact.email }}</span>
+                }
+                @if (state.editableStructured().contact.phone) {
+                  <span>| {{ state.editableStructured().contact.phone }}</span>
+                }
+                @if (state.editableStructured().contact.linkedin) {
+                  <span>| {{ state.editableStructured().contact.linkedin }}</span>
+                }
+                @if (state.editableStructured().contact.github) {
+                  <span>| {{ state.editableStructured().contact.github }}</span>
+                }
+              </div>
+            </header>
+
+            @if (state.editableStructured().professionalSummary) {
+              <section class="latex-section">
+                <h2 class="latex-section-heading">SUMMARY</h2>
+                <p class="latex-summary-paragraph">
+                  {{ state.editableStructured().professionalSummary }}
+                </p>
+              </section>
+            }
+
+            @if (state.editableStructured().skillCategories.length > 0) {
+              <section class="latex-section">
+                <h2 class="latex-section-heading">SKILLS</h2>
+                <div class="latex-skills-list">
+                  @for (cat of state.editableStructured().skillCategories; track cat.id) {
+                    @if (cat.skills.length > 0) {
+                      <div class="latex-skill-row">
+                        <strong class="latex-skill-cat">{{ cat.categoryName }}:</strong>
+                        <span class="latex-skill-items">{{ cat.skills.join(', ') }}</span>
+                      </div>
+                    }
+                  }
+                </div>
+              </section>
+            }
+
+            @if (state.editableStructured().experience.length > 0) {
+              <section class="latex-section">
+                <h2 class="latex-section-heading">WORK EXPERIENCE</h2>
+                @for (exp of state.editableStructured().experience; track exp.id) {
+                  <div class="latex-entry">
+                    <div class="latex-entry-row-primary">
+                      <strong class="latex-entry-title">{{ exp.jobTitle }}</strong>
+                      <span class="latex-entry-date">
+                        {{ exp.startDate }}
+                        @if (exp.endDate) {
+                          – {{ exp.endDate }}
+                        }
+                      </span>
+                    </div>
+                    @if (exp.company || exp.location) {
+                      <div class="latex-entry-row-secondary">
+                        <em class="latex-entry-org">{{ exp.company }}</em>
+                        <em class="latex-entry-loc">{{ exp.location }}</em>
+                      </div>
+                    }
+                    <ul class="latex-bullet-list">
+                      @for (bullet of exp.bullets; track $index) {
+                        @if (bullet.trim()) {
+                          <li>{{ bullet }}</li>
+                        }
+                      }
+                    </ul>
+                  </div>
+                }
+              </section>
+            }
+
+            @if (state.editableStructured().projects.length > 0) {
+              <section class="latex-section">
+                <h2 class="latex-section-heading">PROJECTS</h2>
+                @for (proj of state.editableStructured().projects; track proj.id) {
+                  <div class="latex-entry">
+                    <div class="latex-entry-row-primary">
+                      <div>
+                        <strong class="latex-entry-title">{{ proj.title }}</strong>
+                        @if (proj.technologies) {
+                          <span class="latex-proj-tech"> | <em>{{ proj.technologies }}</em></span>
+                        }
+                      </div>
+                      @if (proj.link) {
+                        <span class="latex-entry-date">{{ proj.link }}</span>
+                      }
+                    </div>
+                    <ul class="latex-bullet-list">
+                      @for (bullet of proj.bullets; track $index) {
+                        @if (bullet.trim()) {
+                          <li>{{ bullet }}</li>
+                        }
+                      }
+                    </ul>
+                  </div>
+                }
+              </section>
+            }
+
+            @if (state.editableStructured().education.length > 0) {
+              <section class="latex-section">
+                <h2 class="latex-section-heading">EDUCATION</h2>
+                @for (edu of state.editableStructured().education; track edu.id) {
+                  <div class="latex-entry">
+                    <div class="latex-entry-row-primary">
+                      <strong class="latex-entry-title">{{ edu.institution }}</strong>
+                      <span class="latex-entry-date">{{ edu.endDate }}</span>
+                    </div>
+                    <div class="latex-entry-row-secondary">
+                      <em>
+                        {{ edu.degree }}
+                        @if (edu.fieldOfStudy) {
+                          in {{ edu.fieldOfStudy }}
+                        }
+                        @if (edu.gradeOrHonors) {
+                          ({{ edu.gradeOrHonors }})
+                        }
+                      </em>
+                      <em>{{ edu.location }}</em>
+                    </div>
+                  </div>
+                }
+              </section>
+            }
+          </article>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

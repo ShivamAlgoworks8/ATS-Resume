@@ -1,0 +1,27 @@
+<nav class="steps-card workflow-stepper-bar" aria-label="ATS Resume Optimization Steps">
+  @for (step of steps; track step.id; let isLast = $last) {
+    <button
+      type="button"
+      class="step step-btn"
+      [class.active]="activeStep === step.id"
+      [class.completed]="isCompleted(step.id)"
+      (click)="navigateToStep(step)"
+    >
+      <span class="step-number">
+        @if (isCompleted(step.id)) {
+          ✓
+        } @else {
+          {{ step.number }}
+        }
+      </span>
+      <span class="step-text">
+        <b>{{ step.title }}</b>
+        <small>{{ step.subtitle }}</small>
+      </span>
+    </button>
+    @if (!isLast) {
+      <div class="step-line" [class.lit]="isCompleted(step.id) || activeStep === step.id"></div>
+    }
+  }
+</nav>
+

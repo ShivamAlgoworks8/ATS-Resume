@@ -1,76 +1,49 @@
-<section class="content library-page">
-        <div class="page-title-row">
-          <div>
-            <div class="eyebrow"><span class="sparkle">✦</span> YOUR PROGRESS, AT A GLANCE</div>
-            <h1>Analysis history</h1>
-            <p>See how your resume is improving with every review.</p>
-          </div>
-          <button class="primary-button" routerLink="/create-resume">＋ New analysis</button>
-        </div>
-        <div class="history-highlight">
-          <div class="highlight-copy">
-            <span class="result-kicker"><span class="live-dot"></span> LAST 30 DAYS</span>
-            <h2>Your resume is moving in the right direction.</h2>
-            <p>Your average ATS score is up <b>12 points</b> across your recent analyses.</p>
-          </div>
-          <div class="trend">
-            <div class="trend-number">76 <small>avg. score</small><span>↑ 12 pts</span></div>
-            <div class="spark-chart">
-              <i style="height: 30%"></i><i style="height: 42%"></i><i style="height: 38%"></i
-              ><i style="height: 55%"></i><i style="height: 49%"></i><i style="height: 69%"></i
-              ><i style="height: 63%"></i><i style="height: 84%"></i><i style="height: 76%"></i
-              ><i style="height: 100%"></i>
+<div class="dashboard-page">
+  <div class="page-intro-bar">
+    <div>
+      <h1 class="page-main-title">My Analyses</h1>
+      <p class="page-main-subtitle">
+        View your past ATS resume analyses and compatibility scores.
+      </p>
+    </div>
+    <div class="intro-actions">
+      <a routerLink="/resume-analyzer" class="btn-primary-action">New Analysis</a>
+    </div>
+  </div>
+
+  @if (state.analysisHistory().length === 0) {
+    <div class="card empty-workflow-card">
+      <h3>No Analyses Yet</h3>
+      <p>Scan your resume against a job description in the Resume Analyzer to see your results here.</p>
+      <a routerLink="/resume-analyzer" class="btn-primary-action">Scan Your Resume</a>
+    </div>
+  } @else {
+    <section class="card">
+      <div class="history-list">
+        @for (entry of visibleEntries(); track entry.id) {
+          <div class="history-item">
+            <span class="company-mark">
+              {{ (entry.companyName || entry.jobTitle || 'A').charAt(0).toUpperCase() }}
+            </span>
+            <div class="resume-name">
+              <b>{{ entry.jobTitle }}</b>
+              <small>
+                @if (entry.companyName) {
+                  {{ entry.companyName }} ·
+                }
+                {{ entry.resumeFileName }} · {{ entry.analyzedDate }}
+              </small>
             </div>
-            <small>JAN 01 <span>JAN 26</span></small>
-          </div>
-        </div>
-        <section class="panel library-panel history-panel">
-          <div class="library-panel-heading">
-            <div>
-              <h2>Recent analyses</h2>
-              <p>Each review helps you move closer to the right role.</p>
+            <div class="history-score">
+              <b>{{ entry.overallScore }}%</b>
+              <small>ATS Match</small>
             </div>
-            <button class="filter-pill" (click)="toastService.show('Showing all analyses')">
-              All analyses⌄
+            <button type="button" class="btn-outline btn-xs" (click)="openAnalysis(entry)">
+              View Results
             </button>
           </div>
-          <div class="history-list">
-            <div class="history-item">
-              <span class="company-mark company-purple">A</span>
-              <div class="resume-name">
-                <b>Senior Software Engineer</b><small>Acme Technologies · Jan 26, 2025</small>
-              </div>
-              <span class="history-status">Completed</span>
-              <div class="history-score"><b>82</b><small>+14 pts</small></div>
-              <button class="row-menu" (click)="toastService.show('Opening your analysis')">→</button>
-            </div>
-            <div class="history-item">
-              <span class="company-mark company-blue">N</span>
-              <div class="resume-name">
-                <b>Full Stack Developer</b><small>Northstar Labs · Jan 22, 2025</small>
-              </div>
-              <span class="history-status">Completed</span>
-              <div class="history-score"><b>76</b><small>+8 pts</small></div>
-              <button class="row-menu" (click)="toastService.show('Opening your analysis')">→</button>
-            </div>
-            <div class="history-item">
-              <span class="company-mark company-orange">L</span>
-              <div class="resume-name">
-                <b>Backend Engineer</b><small>Linear Systems · Jan 18, 2025</small>
-              </div>
-              <span class="history-status">Completed</span>
-              <div class="history-score"><b>71</b><small>+3 pts</small></div>
-              <button class="row-menu" (click)="toastService.show('Opening your analysis')">→</button>
-            </div>
-            <div class="history-item">
-              <span class="company-mark company-green">V</span>
-              <div class="resume-name">
-                <b>Java Developer</b><small>Vertex Digital · Jan 12, 2025</small>
-              </div>
-              <span class="history-status">Completed</span>
-              <div class="history-score"><b>68</b><small>First scan</small></div>
-              <button class="row-menu" (click)="toastService.show('Opening your analysis')">→</button>
-            </div>
-          </div>
-        </section>
-      </section>
+        }
+      </div>
+    </section>
+  }
+</div>

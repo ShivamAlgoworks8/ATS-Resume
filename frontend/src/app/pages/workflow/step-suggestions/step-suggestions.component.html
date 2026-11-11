@@ -1,0 +1,89 @@
+<div class="dashboard-page">
+  <div class="page-intro-bar">
+    <div>
+      <h1 class="page-main-title">Detailed ATS Report</h1>
+      <p class="page-main-subtitle">
+        Review actionable recommendations and approve the changes you want to include in your resume.
+      </p>
+    </div>
+    <div class="intro-actions">
+      <a routerLink="/analysis-results" class="btn-outline">← Back to Analysis Results</a>
+      <button type="button" class="btn-primary-action" (click)="applyAndOpenStudio()">
+        Generate ATS-Friendly Resume
+      </button>
+    </div>
+  </div>
+
+  @if (state.suggestions().length === 0) {
+    <div class="card empty-workflow-card">
+      <h3>No Recommendations Available Yet</h3>
+      <p>Upload your resume and provide a job description in the Resume Analyzer first.</p>
+      <a routerLink="/resume-analyzer" class="btn-primary-action">Go to Resume Analyzer</a>
+    </div>
+  } @else {
+    <div class="category-filter-bar">
+      @for (cat of categories; track cat.key) {
+        <button
+          type="button"
+          class="cat-filter-pill"
+          [class.active]="activeCategoryFilter() === cat.key"
+          (click)="activeCategoryFilter.set(cat.key)"
+        >
+          <span>{{ cat.label }}</span>
+          <span class="cat-count">{{ getCategoryCount(cat.key) }}</span>
+        </button>
+      }
+    </div>
+
+    <div class="suggestions-list">
+      @for (item of filteredSuggestions(); track item.id) {
+        <div
+          class="card suggestion-card"
+          [class.suggestion-approved]="item.decision === 'APPROVED'"
+          [class.suggestion-skipped]="item.decision === 'SKIPPED'"
+        >
+          <div class="suggestion-card-header">
+            <div class="suggestion-badges">
+              <span class="badge-pill badge-green">{{ getCategoryBadgeLabel(item.category) }}</span>
+              <span class="target-section-tag">Section: {{ item.targetSection }}</span>
+            </div>
+
+            <div class="decision-buttons">
+              <button
+                type="button"
+                class="btn-decision btn-approve"
+                [class.active]="item.decision === 'APPROVED'"
+                (click)="approveItem(item.id)"
+              >
+                {{ item.decision === 'APPROVED' ? '✓ Approved' : 'Approve' }}
+              </button>
+              <button
+                type="button"
+                class="btn-decision btn-skip"
+                [class.active]="item.decision === 'SKIPPED'"
+                (click)="skipItem(item.id)"
+              >
+                {{ item.decision === 'SKIPPED' ? 'Skipped' : 'Skip' }}
+              </button>
+            </div>
+          </div>
+
+          <h3 class="suggestion-title">{{ item.title }}</h3>
+
+          <div class="suggestion-comparison-grid">
+            <div class="suggestion-box box-issue">
+              <span class="box-label">OBSERVATION</span>
+              <p>{{ item.currentIssue }}</p>
+              <p><strong>Impact:</strong> {{ item.reason }}</p>
+            </div>
+
+            <div class="suggestion-box box-proposed">
+              <span class="box-label">RECOMMENDED IMPROVEMENT</span>
+              <p>{{ item.suggestedChange }}</p>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>

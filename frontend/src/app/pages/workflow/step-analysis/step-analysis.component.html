@@ -1,0 +1,350 @@
+<div class="dashboard-page">
+  <div class="page-intro-bar">
+    <div>
+      <h1 class="page-main-title">Analysis Results</h1>
+      <p class="page-main-subtitle">
+        ATS compatibility breakdown for
+        <strong>{{ state.jobTitle() || 'Target Job Description' }}</strong>
+        @if (state.companyName()) {
+          <span>at <strong>{{ state.companyName() }}</strong></span>
+        }
+      </p>
+    </div>
+    <div class="intro-actions">
+      @if (state.analysisResult()) {
+        <button type="button" class="btn-outline" (click)="viewDetailedReport()">
+          View Detailed Report
+        </button>
+        <button type="button" class="btn-primary-action" (click)="generateAtsFriendlyResume()">
+          Generate ATS-Friendly Resume
+        </button>
+      }
+    </div>
+  </div>
+
+  @if (!state.analysisResult()) {
+    <div class="card empty-workflow-card">
+      <h3>No ATS Analysis Results Available Yet</h3>
+      <p>
+        Upload your resume and provide a job description in the Resume Analyzer to view your ATS match score, skills breakdown, and recommendations.
+      </p>
+      <a routerLink="/resume-analyzer" class="btn-primary-action">Go to Resume Analyzer</a>
+    </div>
+  } @else {
+    <div class="analysis-hero-grid">
+      <div class="card overall-score-card">
+        <div class="score-ring-wrapper">
+          <svg viewBox="0 0 140 140" width="132" height="132" class="score-ring-svg">
+            <circle cx="70" cy="70" r="58" class="ring-track"></circle>
+            <circle
+              cx="70"
+              cy="70"
+              r="58"
+              class="ring-progress"
+              [style.stroke]="getScoreColor(state.analysisResult()!.overallScore)"
+              [attr.stroke-dasharray]="(state.analysisResult()!.overallScore / 100) * 364.4 + ' 364.4'"
+            ></circle>
+          </svg>
+          <div class="score-ring-center">
+            <span class="score-big-num">{{ state.analysisResult()!.overallScore }}</span>
+            <span class="score-max">/ 100</span>
+          </div>
+        </div>
+        <div class="overall-score-meta">
+          <span class="badge-pill" [ngClass]="getScoreBadgeClass(state.analysisResult()!.overallScore)">
+            {{ getScoreLabel(state.analysisResult()!.overallScore) }}
+          </span>
+          <h3>ATS Match Score</h3>
+          <p>{{ state.analysisResult()!.executiveSummary }}</p>
+          <div class="resume-target-tags">
+            <span class="meta-chip">
+              Resume: {{ state.activeResume()?.originalFileName || 'Uploaded Resume' }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sub-metrics-grid">
+        <div class="card sub-metric-card">
+          <div class="sub-metric-header">
+            <span class="sub-metric-title">Skills Match</span>
+            <span class="sub-metric-val" [style.color]="getScoreColor(state.analysisResult()!.skillsMatchPercentage)">
+              {{ state.analysisResult()!.skillsMatchPercentage }}%
+            </span>
+          </div>
+          <div class="metric-progress-track">
+            <div
+              class="metric-progress-fill"
+              [style.width.%]="state.analysisResult()!.skillsMatchPercentage"
+              [style.background]="getScoreColor(state.analysisResult()!.skillsMatchPercentage)"
+            ></div>
+          </div>
+          <p class="sub-metric-desc">
+            {{ state.analysisResult()!.matchedKeywords.length }} matched vs
+            {{ state.analysisResult()!.missingKeywords.length }} missing skills
+          </p>
+        </div>
+
+        <div class="card sub-metric-card">
+          <div class="sub-metric-header">
+            <span class="sub-metric-title">Experience Relevance</span>
+            <span class="sub-metric-val" [style.color]="getScoreColor(state.analysisResult()!.experienceRelevance)">
+              {{ state.analysisResult()!.experienceRelevance }}%
+            </span>
+          </div>
+          <div class="metric-progress-track">
+            <div
+              class="metric-progress-fill"
+              [style.width.%]="state.analysisResult()!.experienceRelevance"
+              [style.background]="getScoreColor(state.analysisResult()!.experienceRelevance)"
+            ></div>
+          </div>
+          <p class="sub-metric-desc">Role alignment, action verbs, and quantified impact</p>
+        </div>
+
+        <div class="card sub-metric-card">
+          <div class="sub-metric-header">
+            <span class="sub-metric-title">Education Relevance</span>
+            <span class="sub-metric-val" [style.color]="getScoreColor(state.analysisResult()!.educationRelevance)">
+              {{ state.analysisResult()!.educationRelevance }}%
+            </span>
+          </div>
+          <div class="metric-progress-track">
+            <div
+              class="metric-progress-fill"
+              [style.width.%]="state.analysisResult()!.educationRelevance"
+              [style.background]="getScoreColor(state.analysisResult()!.educationRelevance)"
+            ></div>
+          </div>
+          <p class="sub-metric-desc">Academic credentials and degree clarity</p>
+        </div>
+
+        <div class="card sub-metric-card">
+          <div class="sub-metric-header">
+            <span class="sub-metric-title">Formatting &amp; Readability</span>
+            <span class="sub-metric-val" [style.color]="getScoreColor(state.analysisResult()!.formattingScore)">
+              {{ state.analysisResult()!.formattingScore }}%
+            </span>
+          </div>
+          <div class="metric-progress-track">
+            <div
+              class="metric-progress-fill"
+              [style.width.%]="state.analysisResult()!.formattingScore"
+              [style.background]="getScoreColor(state.analysisResult()!.formattingScore)"
+            ></div>
+          </div>
+          <p class="sub-metric-desc">ATS parser compatibility and section structure</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="keywords-analysis-grid">
+      <div class="card keyword-panel">
+        <div class="panel-header-row">
+          <div>
+            <h2 class="card-title">Matched Skills</h2>
+            <p class="card-subtitle">Skills from the job description found in your resume</p>
+          </div>
+          <span class="count-badge badge-green">
+            {{ state.analysisResult()!.matchedKeywords.length }} Matched
+          </span>
+        </div>
+        <div class="chip-cloud">
+          @for (kw of state.analysisResult()!.matchedKeywords; track kw) {
+            <span class="kw-chip kw-matched">✓ {{ kw }}</span>
+          } @empty {
+            <p class="empty-note">No direct skill matches detected.</p>
+          }
+        </div>
+      </div>
+
+      <div class="card keyword-panel">
+        <div class="panel-header-row">
+          <div>
+            <h2 class="card-title">Missing Skills</h2>
+            <p class="card-subtitle">Target skills from the job description missing in your resume</p>
+          </div>
+          <span class="count-badge badge-red">
+            {{ state.analysisResult()!.missingKeywords.length }} Missing
+          </span>
+        </div>
+        <div class="chip-cloud">
+          @for (kw of state.analysisResult()!.missingKeywords; track kw) {
+            <span class="kw-chip kw-missing">+ {{ kw }}</span>
+          } @empty {
+            <p class="empty-note">All primary job description skills are covered.</p>
+          }
+        </div>
+      </div>
+
+      <div class="card keyword-panel">
+        <div class="panel-header-row">
+          <div>
+            <h2 class="card-title">Keyword Analysis</h2>
+            <p class="card-subtitle">Relevant technical and domain keywords detected</p>
+          </div>
+          <span class="count-badge badge-blue">
+            {{ state.analysisResult()!.relevantSkills.length }} Keywords
+          </span>
+        </div>
+        <div class="chip-cloud">
+          @for (skill of state.analysisResult()!.relevantSkills; track skill) {
+            <span class="kw-chip kw-relevant">{{ skill }}</span>
+          } @empty {
+            <p class="empty-note">No additional keywords detected.</p>
+          }
+        </div>
+      </div>
+
+      <div class="card keyword-panel">
+        <div class="panel-header-row">
+          <div>
+            <h2 class="card-title">Secondary Terms</h2>
+            <p class="card-subtitle">Additional terms in your resume not prioritized in the JD</p>
+          </div>
+          <span class="count-badge badge-gray">
+            {{ state.analysisResult()!.extraOrLessRelevantTerms.length }} Terms
+          </span>
+        </div>
+        <div class="chip-cloud">
+          @for (extra of state.analysisResult()!.extraOrLessRelevantTerms; track extra) {
+            <span class="kw-chip kw-neutral">{{ extra }}</span>
+          } @empty {
+            <p class="empty-note">Your resume keywords are tightly focused on the target role.</p>
+          }
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="panel-header-row">
+        <div>
+          <h2 class="card-title">Improvement Recommendations</h2>
+          <p class="card-subtitle">
+            Actionable recommendations based on your resume and target job description
+          </p>
+        </div>
+        <div class="toolbar-right-actions">
+          <button type="button" class="btn-outline btn-sm" (click)="viewDetailedReport()">
+            View Detailed Report
+          </button>
+          <button type="button" class="btn-primary-action btn-sm" (click)="generateAtsFriendlyResume()">
+            Generate ATS-Friendly Resume
+          </button>
+        </div>
+      </div>
+
+      <div class="suggestions-list">
+        @for (item of state.suggestions(); track item.id) {
+          <div
+            class="card suggestion-card"
+            [class.suggestion-approved]="item.decision === 'APPROVED'"
+            [class.suggestion-skipped]="item.decision === 'SKIPPED'"
+          >
+            <div class="suggestion-card-header">
+              <div class="suggestion-badges">
+                <span class="badge-pill badge-green">{{ getCategoryLabel(item.category) }}</span>
+                <span class="target-section-tag">Section: {{ item.targetSection }}</span>
+              </div>
+
+              <div class="decision-buttons">
+                <button
+                  type="button"
+                  class="btn-decision btn-approve"
+                  [class.active]="item.decision === 'APPROVED'"
+                  (click)="approveSuggestion(item.id)"
+                >
+                  {{ item.decision === 'APPROVED' ? '✓ Approved' : 'Approve' }}
+                </button>
+                <button
+                  type="button"
+                  class="btn-decision btn-skip"
+                  [class.active]="item.decision === 'SKIPPED'"
+                  (click)="skipSuggestion(item.id)"
+                >
+                  {{ item.decision === 'SKIPPED' ? 'Skipped' : 'Skip' }}
+                </button>
+              </div>
+            </div>
+
+            <h3 class="suggestion-title">{{ item.title }}</h3>
+
+            <div class="suggestion-comparison-grid">
+              <div class="suggestion-box box-issue">
+                <span class="box-label">CURRENT OBSERVATION</span>
+                <p>{{ item.currentIssue }}</p>
+                <p><strong>Impact:</strong> {{ item.reason }}</p>
+              </div>
+
+              <div class="suggestion-box box-proposed">
+                <span class="box-label">RECOMMENDATION</span>
+                <p>{{ item.suggestedChange }}</p>
+              </div>
+            </div>
+          </div>
+        } @empty {
+          <p class="empty-note">No additional improvement recommendations needed.</p>
+        }
+      </div>
+    </div>
+
+    @if (showDetailedReport()) {
+      <div id="detailed-ats-report-section" class="section-readability-grid">
+        <div class="card">
+          <div class="panel-header-row">
+            <div>
+              <h2 class="card-title">Section-by-Section Breakdown</h2>
+              <p class="card-subtitle">Evaluation across standard ATS resume sections</p>
+            </div>
+          </div>
+
+          <div class="section-eval-list">
+            @for (sec of state.analysisResult()!.sectionEvaluations; track sec.sectionName) {
+              <div class="section-eval-item">
+                <div class="section-eval-top">
+                  <div class="section-eval-title-group">
+                    <h4>{{ sec.sectionName }}</h4>
+                    <span class="badge-pill" [ngClass]="getStatusBadgeClass(sec.status)">
+                      {{ getStatusLabel(sec.status) }}
+                    </span>
+                  </div>
+                  <span class="section-score-num" [style.color]="getScoreColor(sec.score)">
+                    {{ sec.score }}/100
+                  </span>
+                </div>
+                <p class="section-eval-feedback">{{ sec.summary }}</p>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="panel-header-row">
+            <div>
+              <h2 class="card-title">ATS Readability &amp; Formatting</h2>
+              <p class="card-subtitle">Automated parser checks</p>
+            </div>
+          </div>
+
+          <div class="readability-check-list">
+            @for (check of state.analysisResult()!.readabilityChecks; track check.label) {
+              <div
+                class="readability-check-item"
+                [class.check-passed]="check.passed"
+                [class.check-failed]="!check.passed"
+              >
+                <div class="check-status-icon">
+                  {{ check.passed ? '✓' : '!' }}
+                </div>
+                <div class="check-body">
+                  <h4>{{ check.label }}</h4>
+                  <p>{{ check.detail }}</p>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    }
+  }
+</div>
