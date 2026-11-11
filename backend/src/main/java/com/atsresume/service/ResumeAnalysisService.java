@@ -1,0 +1,294 @@
+package com.atsresume.service;
+
+import com.atsresume.exception.FileStorageException;
+import com.atsresume.model.Resume;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.time.Instant;
+import java.util.LinkedHashSet;
+import java.util.Locale;
+import java.util.Set;
+import java.util.UUID;
+import org.springframework.stereotype.Service;
+
+@Service
+public class ResumeAnalysisService {
+
+    private final ResumeParsingService parsingService;
+    private final ResumeOptimizationService optimizationService;
+
+    public ResumeAnalysisService(
+            ResumeParsingService parsingService,
+            ResumeOptimizationService optimizationService) {
+        this.parsingService = parsingService;
+        this.optimizationService = optimizationService;
+    }
+
+    public ObjectNode analyzeResume(
+            Resume resume,
+            JsonNode structured,
+            String jobTitle,
+            String companyName,
+            String jd,
+            int totalMonths) {
+
+        double totalYears = Math.round((totalMonths / 12.0) * 10.0) / 10.0;
+
+        if (structured.isObject()
+                && (!structured.path("originalProjects").isArray() || structured.path("originalProjects").isEmpty())
+                && structured.path("projects").isArray()) {
+            ((ObjectNode) structured).set("originalProjects", structured.path("projects").deepCopy());
+        }
+        JsonNode originalProjects = structured.path("originalProjects").isArray()
+                ? structured.path("originalProjects")
+                : structured.path("projects");
+        boolean hasProjects = originalProjects.isArray() && !originalProjects.isEmpty();
+
+        String systemPrompt = """
+                Analyze the resume against the job description based on contextual meaning and return strict JSON.
+                - Match equivalent skills, abbreviations, and synonyms by meaning (e.g., JS = JavaScript, React.js = React, Postgres = PostgreSQL, K8s = Kubernetes). In "semanticMatches", list at most 6 non-identical alias/synonym pairs where the JD term and resume term are spelled differently (never include identical pairs like Docker = Docker or repeat items).
+                - Do not treat different roles as equivalent.
+                - Evaluate both work experience and any projects present in the resume against the job description. Never invent projects if the resume has none.
+                - For "sanitizedProjects": if the resume has <= 10 projects, include all of them; if > 10 projects, select only the top 10 most relevant to the JD. For each selected project, convert its title ("genericTitle") and bullets ("sanitizedBullets") into generic, professional descriptions that do NOT reveal exact project names, client names, internal modules, or confidential details, while accurately communicating the candidate's real contributions, functionality, and technical skills without inventing facts.
+                - Provide 0-100 scores for "skillsMatchPercentage", "experienceRelevance", "educationRelevance", and "formattingScore", plus a concise "executiveSummary".
+                - Provide 4-6 grounded "suggestions" ("actionType": "REPLACE_BULLET", "REPLACE_SUMMARY", "ADD_SKILL", or "ADVICE") using only facts and numbers already present in the resume. If the resume contains projects, include "PROJECT_IMPROVEMENTS" suggestions tailored to the JD.
+                JSON schema:
+                {
+                  "skillsMatchPercentage": 0, "experienceRelevance": 0, "educationRelevance": 0, "formattingScore": 0,
+                  "executiveSummary": "",
+                  "matchedKeywords": [], "missingKeywords": [], "relevantSkills": [], "extraOrLessRelevantTerms": [],
+                  "semanticMatches": [{ "jdTerm": "", "resumeEvidence": "" }],
+                  "sanitizedProjects": [{ "originalIndex": 0, "genericTitle": "", "sanitizedBullets": [""] }],
+                  "suggestions": [{ "category": "EXPERIENCE_IMPROVEMENTS", "targetSection": "Experience", "title": "", "currentIssue": "", "reason": "", "suggestedChange": "", "originalText": "", "actionType": "REPLACE_BULLET", "targetEntryIndex": 0, "targetBulletIndex": 0 }]
+                }
+                """;
+
+        ObjectNode promptResume = structured.deepCopy();
+        promptResume.set("projects", originalProjects.deepCopy());
+
+        String userPrompt = "Target Job Title: " + jobTitle
+                + "\nTarget Company: " + companyName
+                + "\nCandidate Experience: " + totalMonths + " months (" + totalYears + " years)"
+                + "\n\nJob Description:\n" + jd
+                + "\n\nResume JSON:\n" + promptResume.toString();
+
+        JsonNode aiResult = parsingService.callGroqJson(systemPrompt, userPrompt);
+        if (aiResult == null || !aiResult.isObject()) {
+            throw new FileStorageException("AI analysis failed or Groq API did not return a valid response", null);
+        }
+
+        if (hasProjects && structured.isObject()) {
+            ArrayNode selectedAndSanitized = optimizationService.selectAndSanitizeProjects(
+                    originalProjects,
+                    aiResult.path("sanitizedProjects"),
+                    jd,
+                    resume.getExtractedText());
+            ((ObjectNode) structured).set("projects", selectedAndSanitized);
+        }
+
+        String analysisId = "ana-" + UUID.randomUUID().toString().substring(0, 8);
+        ObjectNode out = parsingService.createObjectNode();
+        out.put("id", analysisId);
+        out.put("analysisId", analysisId);
+        out.put("resumeId", resume.getId());
+        out.put("resumeFileName", resume.getFileName());
+        out.put("jobTitle", jobTitle.isEmpty() ? "Target Role" : jobTitle);
+        out.put("companyName", companyName);
+        out.put("jobDescription", jd);
+        out.put("analyzedAt", Instant.now().toString());
+        out.put("isMockPreview", false);
+        out.put("aiPowered", true);
+        out.put("parsingMethod", "GROQ");
+        out.put("totalExperienceMonths", totalMonths);
+        out.put("totalExperienceYears", totalYears);
+
+        ArrayNode matchedKwArr = out.putArray("matchedKeywords");
+        copyMergedStrings(aiResult.path("matchedKeywords"), aiResult.path("matchedSkills"), matchedKwArr);
+        out.set("matchedSkills", matchedKwArr.deepCopy());
+
+        ArrayNode missingKwArr = out.putArray("missingKeywords");
+        copyMergedStrings(aiResult.path("missingKeywords"), aiResult.path("missingSkills"), missingKwArr);
+        out.set("missingSkills", missingKwArr.deepCopy());
+
+        ArrayNode relevantArr = out.putArray("relevantSkills");
+        copyMergedStrings(aiResult.path("relevantSkills"), aiResult.path("matchedKeywords"), relevantArr);
+
+        ArrayNode extraArr = out.putArray("extraOrLessRelevantTerms");
+        copyMergedStrings(aiResult.path("extraOrLessRelevantTerms"), aiResult.path("lessRelevantSkills"), extraArr);
+        out.set("lessRelevantSkills", extraArr.deepCopy());
+
+        int matchedSkillCount = matchedKwArr.size();
+        int missingSkillCount = missingKwArr.size();
+        int totalJdSkills = matchedSkillCount + missingSkillCount;
+
+        int aiSkillsScore = clampScore(aiResult.path("skillsMatchPercentage").asInt(0));
+        int skillsMatch = totalJdSkills > 0
+                ? clampScore((int) Math.round((matchedSkillCount * 100.0) / totalJdSkills))
+                : aiSkillsScore;
+
+        int expRelevance = validateExperienceScore(
+                clampScore(aiResult.path("experienceRelevance").asInt(0)),
+                totalMonths,
+                structured);
+        int eduRelevance = validateEducationScore(
+                clampScore(aiResult.path("educationRelevance").asInt(0)),
+                structured);
+        int fmtScore = calculateFormattingScore(
+                clampScore(aiResult.path("formattingScore").asInt(0)),
+                structured);
+
+        int overall = clampScore((int) Math.round(
+                skillsMatch * 0.45 + expRelevance * 0.25 + eduRelevance * 0.15 + fmtScore * 0.15));
+
+        out.put("skillsMatchPercentage", skillsMatch);
+        out.put("experienceRelevance", expRelevance);
+        out.put("educationRelevance", eduRelevance);
+        out.put("formattingScore", fmtScore);
+        out.put("overallScore", overall);
+
+        String execSummary = aiResult.path("executiveSummary").asText("").trim();
+        if (execSummary.isEmpty()) {
+            execSummary = "Matched " + matchedSkillCount + " of " + totalJdSkills
+                    + " target JD skills with " + totalYears + " years of experience (Overall ATS Score: " + overall + "/100).";
+        }
+        out.put("executiveSummary", execSummary);
+
+        ArrayNode semArr = out.putArray("semanticMatches");
+        Set<String> seenSem = new LinkedHashSet<>();
+        if (aiResult.path("semanticMatches").isArray()) {
+            for (JsonNode sm : aiResult.path("semanticMatches")) {
+                if (semArr.size() >= 6) {
+                    break;
+                }
+                String jdTerm = sm.path("jdTerm").asText("").trim();
+                String evidence = sm.path("resumeEvidence").asText(sm.path("resumeTerm").asText("")).trim();
+                String normJd = jdTerm.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9+#]", "");
+                String normEv = evidence.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9+#]", "");
+                if (!jdTerm.isEmpty()
+                        && !evidence.isEmpty()
+                        && !normJd.equals(normEv)
+                        && seenSem.add(normJd)) {
+                    ObjectNode item = semArr.addObject();
+                    item.put("jdTerm", jdTerm);
+                    item.put("resumeEvidence", evidence);
+                    item.put("resumeTerm", evidence);
+                }
+            }
+        }
+
+        ArrayNode secArr = out.putArray("sectionEvaluations");
+        addSectionEval(secArr, "Skills & Technical Stack", skillsMatch,
+                matchedSkillCount + " matched and " + missingSkillCount + " missing target skills from the job description.");
+        addSectionEval(secArr, "Work Experience", expRelevance,
+                totalYears + " years (" + totalMonths + " months) total experience evaluated for role alignment and impact.");
+        if (hasProjects) {
+            int totalExtracted = originalProjects.size();
+            int selectedCount = structured.path("projects").size();
+            int projScore = clampScore((int) Math.round(expRelevance * 0.6 + skillsMatch * 0.4));
+            addSectionEval(secArr, "Projects & JD Relevance", projScore,
+                    selectedCount + " of " + totalExtracted + " project(s) selected and sanitized for the target job description.");
+        }
+        addSectionEval(secArr, "Education & Credentials", eduRelevance,
+                structured.path("education").size() + " education entry(s) evaluated against role requirements.");
+        addSectionEval(secArr, "ATS Formatting & Structure", fmtScore,
+                "Evaluated contact completeness, section headers, and bullet structure.");
+        out.set("scoreBreakdown", secArr.deepCopy());
+        out.set("structuredResume", structured);
+
+        ArrayNode checksArr = out.putArray("readabilityChecks");
+        JsonNode contact = structured.path("contact");
+        boolean hasContact = !contact.path("fullName").asText("").isBlank() && !contact.path("email").asText("").isBlank();
+        addReadabilityCheck(checksArr, "Contact Information", hasContact,
+                hasContact ? "Name and email address clearly detected." : "Missing full name or email in contact header.");
+        boolean hasSummary = structured.path("professionalSummary").asText("").length() >= 40;
+        addReadabilityCheck(checksArr, "Executive Summary", hasSummary,
+                hasSummary ? "Professional summary is present and well-sized." : "Add a concise 2-3 sentence professional summary.");
+        boolean hasExp = structured.path("experience").size() > 0 || structured.path("projects").size() > 0;
+        addReadabilityCheck(checksArr, "Experience & Project Bullets", hasExp,
+                hasExp ? "Work experience and project entries parsed into structured bullets." : "No structured experience or project bullets detected.");
+        boolean hasSkills = structured.path("skillCategories").size() > 0;
+        addReadabilityCheck(checksArr, "Categorized Skills Section", hasSkills,
+                hasSkills ? "Skills are organized into clear ATS-friendly categories." : "Group technical skills into clear categories.");
+
+        ArrayNode sugArr = out.putArray("suggestions");
+        optimizationService.populateSuggestions(aiResult.path("suggestions"), sugArr, resume.getExtractedText());
+
+        return out;
+    }
+
+    private void addSectionEval(ArrayNode arr, String sectionName, int score, String summary) {
+        ObjectNode item = arr.addObject();
+        item.put("sectionName", sectionName);
+        item.put("category", sectionName);
+        item.put("score", score);
+        item.put("status", statusForScore(score));
+        item.put("summary", summary);
+        item.putArray("details");
+    }
+
+    private void addReadabilityCheck(ArrayNode arr, String label, boolean passed, String detail) {
+        ObjectNode item = arr.addObject();
+        item.put("label", label);
+        item.put("passed", passed);
+        item.put("detail", detail);
+    }
+
+    private int validateExperienceScore(int aiScore, int totalMonths, JsonNode structured) {
+        int expCount = structured.path("experience").size();
+        int projCount = structured.path("projects").size();
+        if (expCount == 0 && projCount == 0) {
+            return Math.min(aiScore, 25);
+        }
+        if (totalMonths == 0 && expCount == 0) {
+            return Math.min(aiScore, 55);
+        }
+        return aiScore;
+    }
+
+    private int validateEducationScore(int aiScore, JsonNode structured) {
+        if (!structured.path("education").isArray() || structured.path("education").isEmpty()) {
+            return Math.min(aiScore, 40);
+        }
+        return aiScore;
+    }
+
+    private int calculateFormattingScore(int aiScore, JsonNode structured) {
+        int checks = 0;
+        JsonNode contact = structured.path("contact");
+        if (!contact.path("fullName").asText("").isBlank()) checks += 15;
+        if (!contact.path("email").asText("").isBlank()) checks += 15;
+        if (!contact.path("phone").asText("").isBlank()) checks += 10;
+        if (structured.path("professionalSummary").asText("").length() >= 40) checks += 15;
+        if (structured.path("skillCategories").size() > 0) checks += 15;
+        if (structured.path("experience").size() > 0 || structured.path("projects").size() > 0) checks += 15;
+        if (structured.path("education").size() > 0) checks += 15;
+
+        return clampScore((int) Math.round(checks * 0.6 + aiScore * 0.4));
+    }
+
+    private void copyMergedStrings(JsonNode primary, JsonNode secondary, ArrayNode dest) {
+        Set<String> seen = new LinkedHashSet<>();
+        for (JsonNode src : new JsonNode[] { primary, secondary }) {
+            if (src != null && src.isArray()) {
+                for (JsonNode n : src) {
+                    String s = n.isTextual() ? n.asText("").trim() : n.path("name").asText(n.asText("")).trim();
+                    String key = s.toLowerCase(Locale.ROOT);
+                    if (!s.isEmpty() && seen.add(key)) {
+                        dest.add(s);
+                    }
+                }
+            }
+        }
+    }
+
+    private int clampScore(int score) {
+        return Math.max(0, Math.min(100, score));
+    }
+
+    private String statusForScore(int score) {
+        if (score >= 75) return "STRONG";
+        if (score >= 50) return "MODERATE";
+        return "NEEDS_WORK";
+    }
+}
