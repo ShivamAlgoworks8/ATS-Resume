@@ -346,7 +346,7 @@ export class StepStudioComponent {
   }
 
   downloadPdf(): void {
-    this.state.saveStudioChanges();
+    this.state.saveStudioChanges(false);
     const resumeId = this.state.activeResume()?.id;
     const latexCode = generateLatexDocument(this.state.editableStructured());
 
@@ -369,7 +369,7 @@ export class StepStudioComponent {
   }
 
   downloadDocx(): void {
-    this.state.saveStudioChanges();
+    this.state.saveStudioChanges(false);
     const r = this.state.editableStructured();
     const contactParts = [
       r.contact.location,

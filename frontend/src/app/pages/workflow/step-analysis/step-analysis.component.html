@@ -60,6 +60,14 @@
             <span class="meta-chip">
               Resume: {{ state.activeResume()?.originalFileName || 'Uploaded Resume' }}
             </span>
+            @if (state.analysisResult()!.totalExperienceYears !== undefined) {
+              <span class="meta-chip">
+                Experience: {{ state.analysisResult()!.totalExperienceYears }} yrs
+              </span>
+            }
+            <span class="meta-chip">
+              {{ state.analysisResult()!.aiPowered ? 'Groq AI analysis' : 'Rule-based analysis' }}
+            </span>
           </div>
         </div>
       </div>
@@ -156,6 +164,13 @@
             <p class="empty-note">No direct skill matches detected.</p>
           }
         </div>
+        @if (state.analysisResult()!.semanticMatches?.length) {
+          <p class="card-subtitle">
+            @for (m of state.analysisResult()!.semanticMatches; track m.jdTerm; let last = $last) {
+              {{ m.jdTerm }} ← "{{ m.resumeEvidence }}"{{ last ? '' : ' · ' }}
+            }
+          </p>
+        }
       </div>
 
       <div class="card keyword-panel">
@@ -262,7 +277,7 @@
                   [class.active]="item.decision === 'SKIPPED'"
                   (click)="skipSuggestion(item.id)"
                 >
-                  {{ item.decision === 'SKIPPED' ? 'Skipped' : 'Skip' }}
+                  {{ item.decision === 'SKIPPED' ? 'Rejected' : 'Reject' }}
                 </button>
               </div>
             </div>
@@ -270,16 +285,57 @@
             <h3 class="suggestion-title">{{ item.title }}</h3>
 
             <div class="suggestion-comparison-grid">
-              <div class="suggestion-box box-issue">
-                <span class="box-label">CURRENT OBSERVATION</span>
-                <p>{{ item.currentIssue }}</p>
-                <p><strong>Impact:</strong> {{ item.reason }}</p>
-              </div>
+              @if (item.category === 'PROJECT_IMPROVEMENTS' && (item.originalBullets?.length || item.originalText)) {
+                <div class="suggestion-box box-issue">
+                  <span class="box-label">EXISTING PROJECT DESCRIPTION</span>
+                  @if (item.projectTitle) {
+                    <p>
+                      <strong>{{ item.projectTitle }}</strong>
+                      @if (item.projectTechnologies) {
+                        <span> · <em>{{ item.projectTechnologies }}</em></span>
+                      }
+                    </p>
+                  }
+                  @if (item.originalBullets?.length) {
+                    <ul style="margin: 6px 0 8px 18px; padding: 0;">
+                      @for (b of item.originalBullets; track $index) {
+                        <li>{{ b }}</li>
+                      }
+                    </ul>
+                  } @else {
+                    <p>{{ item.originalText }}</p>
+                  }
+                  <p><strong>Observation:</strong> {{ item.currentIssue }}</p>
+                </div>
 
-              <div class="suggestion-box box-proposed">
-                <span class="box-label">RECOMMENDATION</span>
-                <p>{{ item.suggestedChange }}</p>
-              </div>
+                <div class="suggestion-box box-proposed">
+                  <span class="box-label">IMPROVED PROJECT SUGGESTION</span>
+                  @if (item.improvedBullets?.length) {
+                    <ul style="margin: 6px 0 8px 18px; padding: 0;">
+                      @for (b of item.improvedBullets; track $index) {
+                        <li>{{ b }}</li>
+                      }
+                    </ul>
+                  } @else {
+                    <p>{{ item.suggestedChange }}</p>
+                  }
+                  <p><strong>Why:</strong> {{ item.reason }}</p>
+                </div>
+              } @else {
+                <div class="suggestion-box box-issue">
+                  <span class="box-label">CURRENT OBSERVATION</span>
+                  <p>{{ item.currentIssue }}</p>
+                  <p><strong>Impact:</strong> {{ item.reason }}</p>
+                </div>
+
+                <div class="suggestion-box box-proposed">
+                  <span class="box-label">RECOMMENDATION</span>
+                  <p>{{ item.suggestedChange }}</p>
+                  @if (item.requiresCandidateVerification) {
+                    <p><strong>Add only if you genuinely have this skill.</strong></p>
+                  }
+                </div>
+              }
             </div>
           </div>
         } @empty {

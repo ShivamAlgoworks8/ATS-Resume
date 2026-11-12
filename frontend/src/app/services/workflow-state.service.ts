@@ -9,7 +9,6 @@ import {
   SuggestionDecision,
 } from '../models/resume.models';
 import {
-  buildPreviewAtsAnalysis,
   createEmptyStructuredResume,
   parseExtractedTextToStructuredResume,
 } from '../mocks/resume-mock.data';
@@ -69,16 +68,25 @@ export class WorkflowStateService {
 
   setActiveResume(record: ResumeRecord): void {
     this.activeResume.set(record);
-    const parsedOrig = parseExtractedTextToStructuredResume(
-      record.extractedText,
-      record.originalFileName || record.fileName
-    );
-    const parsedEdit = parseExtractedTextToStructuredResume(
-      record.extractedText,
-      record.originalFileName || record.fileName
-    );
-    this.originalStructured.set(parsedOrig);
-    this.editableStructured.set(parsedEdit);
+    const structured = record.structuredResume;
+    if (structured) {
+      this.originalStructured.set(JSON.parse(JSON.stringify(structured)));
+      this.editableStructured.set(JSON.parse(JSON.stringify(structured)));
+    } else {
+      const name = record.originalFileName || record.fileName;
+      this.originalStructured.set(parseExtractedTextToStructuredResume(record.extractedText, name));
+      this.editableStructured.set(parseExtractedTextToStructuredResume(record.extractedText, name));
+      this.resumeApi.reparseResume(record.id).subscribe({
+        next: (updated) => {
+          if (this.activeResume()?.id === updated.id && updated.structuredResume) {
+            this.activeResume.set(updated);
+            this.originalStructured.set(JSON.parse(JSON.stringify(updated.structuredResume)));
+            this.editableStructured.set(JSON.parse(JSON.stringify(updated.structuredResume)));
+          }
+        },
+        error: () => {},
+      });
+    }
     this.analysisResult.set(null);
     this.appliedSuggestionCount.set(0);
     this.backendPdfError.set(null);
@@ -125,27 +133,19 @@ export class WorkflowStateService {
           ...backendResult,
           isMockPreview: false,
         };
+        if (result.structuredResume) {
+          this.originalStructured.set(JSON.parse(JSON.stringify(result.structuredResume)));
+          this.editableStructured.set(JSON.parse(JSON.stringify(result.structuredResume)));
+        }
         this.analysisResult.set(result);
         this.recordHistoryEntry(resume, result);
         this.analyzing.set(false);
         this.toast.show('ATS analysis completed.');
         onComplete();
       },
-      error: () => {
-        // Fallback when backend /analyze endpoint is not available
-        const computedAnalysis = buildPreviewAtsAnalysis(
-          resume.id,
-          this.editableStructured(),
-          resume.extractedText,
-          requestPayload.jobTitle,
-          requestPayload.companyName,
-          requestPayload.jobDescription
-        );
-        this.analysisResult.set(computedAnalysis);
-        this.recordHistoryEntry(resume, computedAnalysis);
+      error: (err) => {
         this.analyzing.set(false);
-        this.toast.show('ATS analysis complete.');
-        onComplete();
+        this.toast.show(err?.error?.message || 'Analysis failed. Make sure the backend is running.');
       },
     });
   }
@@ -177,47 +177,93 @@ export class WorkflowStateService {
     let count = 0;
 
     for (const sug of approved) {
-      if (sug.category === 'SUMMARY_IMPROVEMENTS') {
-        draft.professionalSummary = sug.suggestedChange;
+      const rawText = (sug.suggestedChange || '').trim();
+      const isAddSentence = /^(?:please\s+)?(?:add|include|insert|append)\s+(?:a\s+)?(?:sentence|line|statement)/i.test(rawText);
+      const cleaned = this.cleanResumeLine(rawText);
+      if (!cleaned || this.isInstructionalPhrase(cleaned)) {
+        continue;
+      }
+
+      if (sug.actionType === 'REPLACE_SUMMARY' || sug.category === 'SUMMARY_IMPROVEMENTS') {
+        const existing = (draft.professionalSummary || '').trim();
+        let nextSummary = cleaned;
+        if (isAddSentence && existing && !existing.includes(cleaned)) {
+          const sep = existing.endsWith('.') ? ' ' : '. ';
+          nextSummary = existing + sep + cleaned;
+        }
+        draft.professionalSummary = this.capSummaryWords(nextSummary, 80);
         draft.summaryAiModified = true;
         count++;
-      } else if (sug.category === 'MISSING_SKILLS') {
-        const skillToAdd = sug.suggestedChange.trim();
-        const allExisting = draft.skillCategories
-          .flatMap((c) => c.skills)
-          .map((s) => s.toLowerCase());
-        if (skillToAdd && !allExisting.includes(skillToAdd.toLowerCase())) {
-          if (draft.skillCategories.length === 0) {
-            draft.skillCategories.push({
-              id: 'cat-1',
-              categoryName: 'Technical Skills',
-              skills: [skillToAdd],
-            });
-          } else {
-            const targetGroup = draft.skillCategories[draft.skillCategories.length - 1];
-            targetGroup.skills = [...targetGroup.skills, skillToAdd];
-          }
-          count++;
-        }
-      } else if (
-        sug.category === 'EXPERIENCE_IMPROVEMENTS' ||
-        sug.category === 'ACHIEVEMENTS_METRICS' ||
-        sug.category === 'MISSING_KEYWORDS'
-      ) {
-        if (draft.experience.length > 0) {
-          const firstExp = draft.experience[0];
-          if (!firstExp.bullets.includes(sug.suggestedChange)) {
-            firstExp.bullets = [sug.suggestedChange, ...firstExp.bullets];
-            firstExp.aiModified = true;
+      } else if (sug.actionType === 'ADD_SKILL' || sug.category === 'MISSING_SKILLS') {
+        const strippedSkills = cleaned
+          .replace(/\s+(?:to|in)\s+(?:your\s+|the\s+)?(?:skills?|resume|section).*$/i, '')
+          .split(/[,;/]+/)
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0 && s.length <= 35 && !this.isInstructionalPhrase(s));
+        const key = (v: string) => v.toLowerCase().replace(/[\s.\-_/]+/g, '');
+        for (const skillToAdd of strippedSkills) {
+          const exists = draft.skillCategories.some((c) => c.skills.some((x) => key(x) === key(skillToAdd)));
+          if (!exists) {
+            if (draft.skillCategories.length === 0) {
+              draft.skillCategories.push({ id: 'cat-1', categoryName: 'Skills', skills: [skillToAdd] });
+            } else {
+              const target = draft.skillCategories[draft.skillCategories.length - 1];
+              target.skills = [...target.skills, skillToAdd];
+            }
             count++;
           }
         }
-      } else if (sug.category === 'PROJECT_IMPROVEMENTS') {
-        if (draft.projects.length > 0) {
-          const firstProj = draft.projects[0];
-          if (!firstProj.bullets.includes(sug.suggestedChange)) {
-            firstProj.bullets = [sug.suggestedChange, ...firstProj.bullets];
-            firstProj.aiModified = true;
+      } else if (
+        sug.category === 'PROJECT_IMPROVEMENTS' &&
+        sug.improvedBullets &&
+        sug.improvedBullets.length > 0 &&
+        draft.projects.length > 0
+      ) {
+        const cleanTitle = (v?: string) => (v || '').trim().toLowerCase();
+        const hintIdx = sug.targetEntryIndex ?? -1;
+        let targetProj =
+          hintIdx >= 0 &&
+          hintIdx < draft.projects.length &&
+          (!sug.projectTitle || cleanTitle(draft.projects[hintIdx].title) === cleanTitle(sug.projectTitle))
+            ? draft.projects[hintIdx]
+            : draft.projects.find((p) => cleanTitle(p.title) === cleanTitle(sug.projectTitle));
+        if (!targetProj && hintIdx >= 0 && hintIdx < draft.projects.length) {
+          targetProj = draft.projects[hintIdx];
+        }
+        if (targetProj) {
+          targetProj.bullets = [...sug.improvedBullets];
+          targetProj.aiModified = true;
+          count++;
+        }
+      } else if (sug.actionType === 'REPLACE_BULLET') {
+        const norm = (v: string) => v.toLowerCase().replace(/[^a-z0-9+#]/g, '');
+        const target = sug.originalText ? norm(sug.originalText) : '';
+        let applied = false;
+        if (target) {
+          for (const entry of [...draft.experience, ...draft.projects]) {
+            const idx = entry.bullets.findIndex((b) => norm(b) === target || norm(b).includes(target) || target.includes(norm(b)));
+            if (idx >= 0) {
+              entry.bullets[idx] = cleaned;
+              entry.aiModified = true;
+              count++;
+              applied = true;
+              break;
+            }
+          }
+        }
+        if (!applied) {
+          const isProject = sug.category === 'PROJECT_IMPROVEMENTS' || sug.targetSection?.toLowerCase().includes('project');
+          const list = isProject ? draft.projects : draft.experience;
+          if (list.length > 0) {
+            const eIdx = Math.min(Math.max(sug.targetEntryIndex ?? 0, 0), list.length - 1);
+            const entry = list[eIdx];
+            if (entry.bullets.length > 0) {
+              const bIdx = Math.min(Math.max(sug.targetBulletIndex ?? 0, 0), entry.bullets.length - 1);
+              entry.bullets[bIdx] = cleaned;
+            } else {
+              entry.bullets.push(cleaned);
+            }
+            entry.aiModified = true;
             count++;
           }
         }
@@ -226,7 +272,101 @@ export class WorkflowStateService {
 
     this.editableStructured.set(draft);
     this.appliedSuggestionCount.set(count);
+
+    const resume = this.activeResume();
+    if (resume && approved.length > 0) {
+      this.resumeApi
+        .optimizeResumeOnBackend(resume.id, {
+          resumeId: resume.id,
+          approvedSuggestionIds: approved.map((s) => s.id),
+          jobDescription: this.jobDescription(),
+        })
+        .subscribe({
+          next: (optimized) => {
+            if (optimized) {
+              this.editableStructured.set(optimized);
+            }
+          },
+          error: () => {},
+        });
+    }
+
     return count;
+  }
+
+  private cleanResumeLine(text: string): string {
+    if (!text) return '';
+    let t = text.trim();
+    const quotedMatch = t.match(
+      /^(?:add|include|insert|rephrase|rewrite|consider|you\s+should|you\s+could|suggested|recommended|try|use)[^"'“‘]*["“'‘]([^"”'’]{15,})["”'’]\s*\.?\s*$/i
+    );
+    if (quotedMatch) {
+      t = quotedMatch[1].trim();
+    } else {
+      t = t
+        .replace(
+          /^(?:(?:please\s+)?(?:add|include|insert|append)\s+(?:a\s+|the\s+|following\s+)?(?:sentence|bullet|line|statement|point|phrase|skill|keywords?)?(?:\s+(?:such\s+as|like|stating|to\s+[^:]+))?|(?:please\s+)?(?:rephrase|rewrite|revise|reword|change|update|replace|modify)(?:\s+(?:this|the\s+bullet|the\s+summary|it))?(?:\s+(?:to|as|with|like))?|(?:consider\s+)?(?:adding|including|rephrasing|rewriting|mentioning|highlighting|stating)(?:\s+(?:a\s+sentence|a\s+bullet|something)\s+(?:such\s+as|like))?|you\s+(?:should|could|can|may)\s+(?:mention|add|include|write|state|highlight|rephrase(?:\s+to)?)|(?:suggested|recommended)\s+(?:rewrite|change|bullet|summary|addition|text|phrasing)|for\s+example|\be\.g\.,?)\s*[:\-–—]?\s*/i,
+          ''
+        )
+        .trim();
+    }
+    if (
+      (t.startsWith('"') && t.endsWith('"')) ||
+      (t.startsWith("'") && t.endsWith("'")) ||
+      (t.startsWith('“') && t.endsWith('”')) ||
+      (t.startsWith('‘') && t.endsWith('’'))
+    ) {
+      t = t.slice(1, -1).trim();
+    }
+    return t;
+  }
+
+  private capSummaryWords(text: string, maxWords = 80): string {
+    if (!text || !text.trim()) return '';
+    const cleaned = text.replace(/\s+/g, ' ').trim();
+    const words = cleaned.split(/\s+/);
+    if (words.length <= maxWords) {
+      return cleaned;
+    }
+    let lastSentenceIdx = -1;
+    for (let i = Math.max(0, maxWords - 25); i < maxWords; i++) {
+      if (/[.!?]$/.test(words[i])) {
+        lastSentenceIdx = i;
+      }
+    }
+    const limit = lastSentenceIdx >= 0 ? lastSentenceIdx + 1 : maxWords;
+    let truncated = words
+      .slice(0, limit)
+      .join(' ')
+      .replace(/[,;:\-–—]+$/, '')
+      .replace(/\s+\b(?:and|or|with|for|in|to|by|of|across|using|including|through|while|as|a|an|the)$/i, '')
+      .trim();
+    if (!/[.!?]$/.test(truncated)) {
+      truncated += '.';
+    }
+    return truncated;
+  }
+
+  private isInstructionalPhrase(text: string): boolean {
+    if (!text || !text.trim()) return true;
+    const t = text.trim();
+    if (
+      /^(?:add\s+a\s+|add\s+more\s+|include\s+a\s+|consider\s+|you\s+should\b|you\s+could\b|make\s+sure\b|ensure\s+that\b|try\s+to\b|don't\s+forget\b|be\s+sure\s+to\b|highlight\s+your\b|mention\s+your\b|emphasize\s+your\b|quantify\s+your\b|specify\s+how\b|state\s+how\b|rephrase\s+this\b|rewrite\s+this\b)/i.test(
+        t
+      )
+    ) {
+      return true;
+    }
+    const lower = t.toLowerCase();
+    return (
+      lower.includes('add a sentence') ||
+      lower.includes('rephrase to') ||
+      lower.includes('consider adding') ||
+      lower.includes('you should mention') ||
+      lower.includes('in your resume') ||
+      lower.includes('in the summary section') ||
+      lower.includes('to your skills section')
+    );
   }
 
   resetStudioToOriginal(): void {
@@ -236,7 +376,7 @@ export class WorkflowStateService {
     this.toast.show('Restored original resume content.');
   }
 
-  saveStudioChanges(): void {
+  saveStudioChanges(showToast = true): void {
     const resume = this.activeResume();
     const currentStructured = this.editableStructured();
     this.lastSavedAt.set(
@@ -244,17 +384,23 @@ export class WorkflowStateService {
     );
 
     if (!resume) {
-      this.toast.show('Saved changes to Resume Generator.');
+      if (showToast) {
+        this.toast.show('Saved changes to Resume Generator.');
+      }
       return;
     }
 
     this.resumeApi.saveStructuredResumeOnBackend(resume.id, currentStructured).subscribe({
       next: (saved) => {
         this.editableStructured.set(saved);
-        this.toast.show('Resume changes saved to backend.');
+        if (showToast) {
+          this.toast.show('Resume changes saved to backend.');
+        }
       },
       error: () => {
-        this.toast.show('Changes saved in Resume Generator.');
+        if (showToast) {
+          this.toast.show('Changes saved in Resume Generator.');
+        }
       },
     });
   }

@@ -1584,9 +1584,16 @@
 }
 
 @media print {
+  @page {
+    size: auto;
+    margin: 0mm;
+  }
+
   .no-print,
   .sidebar,
-  .topbar {
+  .topbar,
+  .toast,
+  app-toast {
     display: none !important;
   }
 
@@ -1619,7 +1626,7 @@
   .latex-paper-sheet {
     box-shadow: none !important;
     border: 0 !important;
-    padding: 0 !important;
+    padding: 14mm 16mm !important;
     max-width: 100% !important;
   }
 }

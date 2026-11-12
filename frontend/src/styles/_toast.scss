@@ -28,6 +28,13 @@
   }
 }
 
+@media print {
+  app-toast,
+  .toast {
+    display: none !important;
+  }
+}
+
 @keyframes toast-in {
   from {
     opacity: 0;

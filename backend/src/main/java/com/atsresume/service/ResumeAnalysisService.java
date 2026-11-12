@@ -5,9 +5,18 @@ import com.atsresume.model.Resume;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -51,12 +60,14 @@ public class ResumeAnalysisService {
                 - Do not treat different roles as equivalent.
                 - Evaluate both work experience and any projects present in the resume against the job description. Never invent projects if the resume has none.
                 - For "sanitizedProjects": if the resume has <= 10 projects, include all of them; if > 10 projects, select only the top 10 most relevant to the JD. For each selected project, convert its title ("genericTitle") and bullets ("sanitizedBullets") into generic, professional descriptions that do NOT reveal exact project names, client names, internal modules, or confidential details, while accurately communicating the candidate's real contributions, functionality, and technical skills without inventing facts.
+                - For "optimizedProfessionalSummary": analyze and understand the candidate's entire resume (experience, core technical skills, projects, and domain impact) alongside the target Job Description, and write an impactful, ATS-optimized professional profile summary of approximately 75 to 80 words (strictly maximum 80 words). Use ONLY real facts, skills, and experience from the resume, tailored to the JD, with zero meta-instructions.
                 - Provide 0-100 scores for "skillsMatchPercentage", "experienceRelevance", "educationRelevance", and "formattingScore", plus a concise "executiveSummary".
-                - Provide 4-6 grounded "suggestions" ("actionType": "REPLACE_BULLET", "REPLACE_SUMMARY", "ADD_SKILL", or "ADVICE") using only facts and numbers already present in the resume. If the resume contains projects, include "PROJECT_IMPROVEMENTS" suggestions tailored to the JD.
+                - Provide 4-6 grounded "suggestions" ("actionType": "REPLACE_BULLET", "REPLACE_SUMMARY", "ADD_SKILL", or "ADVICE") using only facts and numbers already present in the resume. Any "REPLACE_SUMMARY" suggestion must also be a complete ~75-80 word profile summary (strictly maximum 80 words). If the resume contains projects, do NOT include project suggestions here (they are generated separately).
                 JSON schema:
                 {
                   "skillsMatchPercentage": 0, "experienceRelevance": 0, "educationRelevance": 0, "formattingScore": 0,
                   "executiveSummary": "",
+                  "optimizedProfessionalSummary": "",
                   "matchedKeywords": [], "missingKeywords": [], "relevantSkills": [], "extraOrLessRelevantTerms": [],
                   "semanticMatches": [{ "jdTerm": "", "resumeEvidence": "" }],
                   "sanitizedProjects": [{ "originalIndex": 0, "genericTitle": "", "sanitizedBullets": [""] }],
@@ -66,6 +77,18 @@ public class ResumeAnalysisService {
 
         ObjectNode promptResume = structured.deepCopy();
         promptResume.set("projects", originalProjects.deepCopy());
+        // Score the candidate's own summary, not a summary previously rewritten for a JD in an earlier scan
+        String originalSummary = structured.path("originalSummary").asText("");
+        if (!originalSummary.isBlank()) {
+            promptResume.put("professionalSummary", originalSummary);
+        }
+        promptResume.remove("originalSummary");
+
+        // Text that proves a skill really exists in the resume (excludes the AI-optimized summary)
+        String resumeEvidence = (resume.getExtractedText() == null ? "" : resume.getExtractedText())
+                + " " + structured.path("skillCategories")
+                + " " + structured.path("experience")
+                + " " + originalProjects;
 
         String userPrompt = "Target Job Title: " + jobTitle
                 + "\nTarget Company: " + companyName
@@ -73,9 +96,22 @@ public class ResumeAnalysisService {
                 + "\n\nJob Description:\n" + jd
                 + "\n\nResume JSON:\n" + promptResume.toString();
 
-        JsonNode aiResult = parsingService.callGroqJson(systemPrompt, userPrompt);
+        // Same resume + JD + prompt => reuse the stored AI result so repeated scans give the same score
+        String cacheKey = sha256(systemPrompt + "\n" + userPrompt);
+        JsonNode aiResult = null;
+        Map<String, Object> cache = resume.getAnalysisAiCache();
+        if (cache != null && cacheKey.equals(cache.get("key")) && cache.get("result") instanceof String cached) {
+            aiResult = parsingService.readJson(cached);
+        }
         if (aiResult == null || !aiResult.isObject()) {
-            throw new FileStorageException("AI analysis failed or Groq API did not return a valid response", null);
+            aiResult = parsingService.callGroqJson(systemPrompt, userPrompt);
+            if (aiResult == null || !aiResult.isObject()) {
+                throw new FileStorageException("AI analysis failed or Groq API did not return a valid response", null);
+            }
+            Map<String, Object> fresh = new HashMap<>();
+            fresh.put("key", cacheKey);
+            fresh.put("result", aiResult.toString());
+            resume.setAnalysisAiCache(fresh);
         }
 
         if (hasProjects && structured.isObject()) {
@@ -85,6 +121,16 @@ public class ResumeAnalysisService {
                     jd,
                     resume.getExtractedText());
             ((ObjectNode) structured).set("projects", selectedAndSanitized);
+        }
+
+        if (structured.isObject()) {
+            String optimizedSummary = optimizationService.buildOptimizedProfileSummary(
+                    aiResult.path("optimizedProfessionalSummary").asText(""),
+                    structured,
+                    resume.getExtractedText());
+            if (!optimizedSummary.isEmpty()) {
+                ((ObjectNode) structured).put("professionalSummary", optimizedSummary);
+            }
         }
 
         String analysisId = "ana-" + UUID.randomUUID().toString().substring(0, 8);
@@ -105,10 +151,13 @@ public class ResumeAnalysisService {
 
         ArrayNode matchedKwArr = out.putArray("matchedKeywords");
         copyMergedStrings(aiResult.path("matchedKeywords"), aiResult.path("matchedSkills"), matchedKwArr);
-        out.set("matchedSkills", matchedKwArr.deepCopy());
 
         ArrayNode missingKwArr = out.putArray("missingKeywords");
         copyMergedStrings(aiResult.path("missingKeywords"), aiResult.path("missingSkills"), missingKwArr);
+
+        // Re-check every AI keyword against the real resume text so the AI cannot over/under-claim matches
+        reconcileKeywords(matchedKwArr, missingKwArr, aiResult.path("semanticMatches"), resumeEvidence);
+        out.set("matchedSkills", matchedKwArr.deepCopy());
         out.set("missingSkills", missingKwArr.deepCopy());
 
         ArrayNode relevantArr = out.putArray("relevantSkills");
@@ -127,8 +176,25 @@ public class ResumeAnalysisService {
                 ? clampScore((int) Math.round((matchedSkillCount * 100.0) / totalJdSkills))
                 : aiSkillsScore;
 
+        // Experience relevance is calculated in Java: 80% JD-keyword coverage inside experience/project text
+        // plus 20% years of experience (capped at 5 years). The AI score is only a fallback.
+        int aiExpScore = clampScore(aiResult.path("experienceRelevance").asInt(0));
+        if (totalJdSkills > 0) {
+            String normExperience = normalizeTerm(structured.path("experience") + " " + originalProjects);
+            int usedInWork = 0;
+            for (ArrayNode list : new ArrayNode[] { matchedKwArr, missingKwArr }) {
+                for (JsonNode kw : list) {
+                    if (termInEvidence(kw.asText(), normExperience)) {
+                        usedInWork++;
+                    }
+                }
+            }
+            double coverage = usedInWork * 100.0 / totalJdSkills;
+            double duration = Math.min(totalMonths, 60) / 60.0 * 100.0;
+            aiExpScore = clampScore((int) Math.round(coverage * 0.8 + duration * 0.2));
+        }
         int expRelevance = validateExperienceScore(
-                clampScore(aiResult.path("experienceRelevance").asInt(0)),
+                aiExpScore,
                 totalMonths,
                 structured);
         int eduRelevance = validateEducationScore(
@@ -213,6 +279,29 @@ public class ResumeAnalysisService {
 
         ArrayNode sugArr = out.putArray("suggestions");
         optimizationService.populateSuggestions(aiResult.path("suggestions"), sugArr, resume.getExtractedText());
+        if (hasProjects) {
+            JsonNode selectedProjects = structured.path("projects");
+            String projCacheKey = sha256(selectedProjects.toString() + "\n" + jd);
+            JsonNode aiProjectResult = null;
+            Map<String, Object> aiCache = resume.getAnalysisAiCache();
+            if (aiCache != null
+                    && projCacheKey.equals(aiCache.get("projectKey"))
+                    && aiCache.get("projectResult") instanceof String cachedProj) {
+                aiProjectResult = parsingService.readJson(cachedProj);
+            }
+            if (aiProjectResult == null || !aiProjectResult.path("projectSuggestions").isArray()) {
+                aiProjectResult = optimizationService.fetchProjectSuggestionsFromAi(
+                        selectedProjects, structured.path("skillCategories"), jd);
+                if (aiProjectResult != null && aiProjectResult.path("projectSuggestions").isArray()) {
+                    Map<String, Object> updatedCache = aiCache == null ? new HashMap<>() : new HashMap<>(aiCache);
+                    updatedCache.put("projectKey", projCacheKey);
+                    updatedCache.put("projectResult", aiProjectResult.toString());
+                    resume.setAnalysisAiCache(updatedCache);
+                }
+            }
+            optimizationService.populateProjectSuggestions(
+                    selectedProjects, aiProjectResult, resume.getExtractedText(), sugArr);
+        }
 
         return out;
     }
@@ -264,7 +353,74 @@ public class ResumeAnalysisService {
         if (structured.path("experience").size() > 0 || structured.path("projects").size() > 0) checks += 15;
         if (structured.path("education").size() > 0) checks += 15;
 
-        return clampScore((int) Math.round(checks * 0.6 + aiScore * 0.4));
+        // Deterministic: formatting is scored only from structural checks, not from a subjective AI number
+        return clampScore(checks);
+    }
+
+    private String sha256(String text) {
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
+    }
+
+    private String normalizeTerm(String text) {
+        String t = text == null ? "" : text.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9+#]+", " ").trim();
+        StringBuilder sb = new StringBuilder();
+        for (String tok : t.split("\\s+")) {
+            if (tok.length() > 3 && tok.endsWith("s")) {
+                tok = tok.substring(0, tok.length() - 1);
+            }
+            sb.append(tok).append(' ');
+        }
+        return " " + sb.toString().trim() + " ";
+    }
+
+    private boolean termInEvidence(String term, String normEvidence) {
+        String nt = normalizeTerm(term);
+        if (nt.isBlank()) {
+            return false;
+        }
+        if (normEvidence.contains(nt)) {
+            return true;
+        }
+        String[] tokens = nt.trim().split("\\s+");
+        if (tokens.length < 2) {
+            return false;
+        }
+        for (String tok : tokens) {
+            if (tok.length() >= 3 && !normEvidence.contains(" " + tok + " ")) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void reconcileKeywords(ArrayNode matched, ArrayNode missing, JsonNode semanticMatches, String evidenceText) {
+        String normEvidence = normalizeTerm(evidenceText);
+        Set<String> semanticOk = new HashSet<>();
+        if (semanticMatches != null && semanticMatches.isArray()) {
+            for (JsonNode sm : semanticMatches) {
+                String ev = sm.path("resumeEvidence").asText(sm.path("resumeTerm").asText(""));
+                if (termInEvidence(ev, normEvidence)) {
+                    semanticOk.add(normalizeTerm(sm.path("jdTerm").asText("")));
+                }
+            }
+        }
+        List<String> all = new ArrayList<>();
+        matched.forEach(n -> all.add(n.asText()));
+        missing.forEach(n -> all.add(n.asText()));
+        matched.removeAll();
+        missing.removeAll();
+        for (String term : all) {
+            if (termInEvidence(term, normEvidence) || semanticOk.contains(normalizeTerm(term))) {
+                matched.add(term);
+            } else {
+                missing.add(term);
+            }
+        }
     }
 
     private void copyMergedStrings(JsonNode primary, JsonNode secondary, ArrayNode dest) {

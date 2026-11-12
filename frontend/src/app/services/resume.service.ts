@@ -71,6 +71,16 @@ export class ResumeApiService {
     );
   }
 
+  reparseResume(id: string): Observable<ResumeRecord> {
+    return this.http.post<ResumeRecord>(`${this.baseUrl}/${id}/reparse`, {});
+  }
+
+  extractText(file: File): Observable<{ text: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<{ text: string }>(`${this.baseUrl}/extract-text`, formData);
+  }
+
   analyzeResumeOnBackend(
     resumeId: string,
     payload: AtsAnalysisRequest

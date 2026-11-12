@@ -33,6 +33,10 @@ public class Resume {
     @JsonIgnore
     private Map<String, Object> lastAnalysis;
 
+    // Stores the raw AI result (as JSON text) for the last analysis input so identical scans stay identical
+    @JsonIgnore
+    private Map<String, Object> analysisAiCache;
+
     public Resume() {
     }
 
@@ -153,5 +157,15 @@ public class Resume {
     @JsonIgnore
     public void setLastAnalysis(Map<String, Object> lastAnalysis) {
         this.lastAnalysis = lastAnalysis;
+    }
+
+    @JsonIgnore
+    public Map<String, Object> getAnalysisAiCache() {
+        return analysisAiCache;
+    }
+
+    @JsonIgnore
+    public void setAnalysisAiCache(Map<String, Object> analysisAiCache) {
+        this.analysisAiCache = analysisAiCache;
     }
 }

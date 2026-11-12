@@ -187,26 +187,26 @@ export class StepUploadComponent implements OnInit {
       return;
     }
     this.state.jdFileName.set(file.name);
-    if (file.name.toLowerCase().endsWith('.txt')) {
+    const lower = file.name.toLowerCase();
+    if (lower.endsWith('.txt')) {
       file.text().then((text) => {
         this.state.jobDescription.set(text.slice(0, 5000));
         this.state.jdInputMode.set('paste');
         this.toast.show(`Loaded job description text from ${file.name}.`);
       });
-    } else {
-      file.text().then((raw) => {
-        const printable = raw.replace(/[^\x20-\x7E\n\r]/g, ' ').replace(/\s+/g, ' ').trim();
-        if (printable.length > 40 && !printable.startsWith('%PDF')) {
-          this.state.jobDescription.set(printable.slice(0, 5000));
+    } else if (lower.endsWith('.pdf') || lower.endsWith('.docx')) {
+      this.resumeApi.extractText(file).subscribe({
+        next: ({ text }) => {
+          this.state.jobDescription.set((text || '').trim().slice(0, 5000));
           this.state.jdInputMode.set('paste');
           this.toast.show(`Extracted text from ${file.name}.`);
-        } else {
-          this.jdValidationError.set(
-            `Uploaded "${file.name}". For binary PDF/DOCX job descriptions, please paste the job requirements text directly.`
-          );
-          this.state.jdInputMode.set('paste');
-        }
+        },
+        error: (err) => {
+          this.jdValidationError.set(err?.error?.message || `Could not read "${file.name}". Paste the text instead.`);
+        },
       });
+    } else {
+      this.jdValidationError.set('Supported job description files: .txt, .pdf, .docx');
     }
   }
 }

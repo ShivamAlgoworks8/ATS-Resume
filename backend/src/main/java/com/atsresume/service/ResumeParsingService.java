@@ -98,9 +98,10 @@ public class ResumeParsingService {
                 Rules:
                 1. Extract ONLY facts present in the resume text. Never invent companies, roles, projects, skills, dates, or metrics.
                 2. Separate work/internship roles into "experience" and explicitly mentioned projects into "projects".
-                3. Extract ALL projects that are explicitly mentioned in the resume (e.g. under PROJECTS, Project Details, SELECTED ENTERPRISE PROJECTS, ADDITIONAL PROJECTS, Key Projects, or labeled as a Project). If no projects are mentioned in the resume, return an empty array [] for "projects". Never create projects on your own from regular work experience.
+                3. Extract ALL projects that are explicitly mentioned in the resume (e.g. under PROJECTS, Project Details, SELECTED ENTERPRISE PROJECTS, ADDITIONAL PROJECTS, Key Projects, Academic Projects, or labeled as a Project). Preserve EVERY distinct project as its own entry in exact resume order — NEVER skip, merge, group, or deduplicate separate projects. Even if the resume has more than 10 projects, still extract all of them here. If no projects are mentioned in the resume, return an empty array [] for "projects". Never create projects on your own from regular work experience.
                 4. Extract ALL work experience entries with their exact startDate and endDate strings (e.g. "Jan 2022", "Present", "Nov 2020").
                 5. Extract ALL education entries and ALL certifications/awards/achievements.
+                6. For "professionalSummary", analyze the candidate's entire resume (experience, core skills, domain expertise, and projects) and craft a strong, polished, ATS-friendly profile summary of approximately 75 to 80 words (strictly maximum 80 words) grounded 100% in the candidate's real resume facts.
                 Return ONLY a JSON object with this exact structure:
                 {
                   "contact": {
@@ -188,8 +189,9 @@ public class ResumeParsingService {
             try {
                 ObjectNode payload = mapper.createObjectNode();
                 payload.put("model", model);
-                payload.put("temperature", 0.1);
-                payload.put("max_tokens", 4096);
+                payload.put("temperature", 0);
+                payload.put("seed", 42);
+                payload.put("max_tokens", 8192);
                 payload.putObject("response_format").put("type", "json_object");
 
                 ArrayNode messages = payload.putArray("messages");
@@ -207,6 +209,11 @@ public class ResumeParsingService {
                 HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
                 if (response.statusCode() == 429) {
                     log.warn("Groq rate limit (429) on model {}, trying next model", model);
+                    try {
+                        Thread.sleep(1500);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
                     continue;
                 }
                 if (response.statusCode() < 200 || response.statusCode() >= 300) {
@@ -239,7 +246,11 @@ public class ResumeParsingService {
         contact.put("github", cIn.path("github").asText("").trim());
         contact.put("portfolio", cIn.path("portfolio").asText("").trim());
 
-        root.put("professionalSummary", input.path("professionalSummary").asText("").trim());
+        String parsedSummary = capSummaryWords(input.path("professionalSummary").asText("").trim(), 80);
+        root.put("professionalSummary", parsedSummary);
+        // Keep the candidate's own summary across saves/analyses; only default to the parsed one
+        String keptOriginal = input.path("originalSummary").asText("").trim();
+        root.put("originalSummary", keptOriginal.isEmpty() ? parsedSummary : keptOriginal);
 
         ArrayNode skillCats = root.putArray("skillCategories");
         int catIdx = 1;
@@ -315,7 +326,8 @@ public class ResumeParsingService {
                     }
                 }
                 String tech = proj.path("technologies").asText(proj.path("domain").asText("")).trim();
-                if (!appearsInText(title, sourceText)) {
+                String firstBullet = bullets.isEmpty() ? "" : bullets.get(0).asText("");
+                if (!appearsInText(title, sourceText) && (firstBullet.isEmpty() || !appearsInText(firstBullet, sourceText))) {
                     continue;
                 }
                 ObjectNode pNode = projArr.addObject();
@@ -424,6 +436,11 @@ public class ResumeParsingService {
         if (normCand.isEmpty() || normSource.contains(normCand)) {
             return true;
         }
+        String compactSource = normSource.replace(" ", "");
+        String compactCand = normCand.replace(" ", "");
+        if (compactCand.length() >= 4 && compactSource.contains(compactCand)) {
+            return true;
+        }
         String[] tokens = normCand.split("\\s+");
         int matched = 0;
         for (String tok : tokens) {
@@ -440,6 +457,14 @@ public class ResumeParsingService {
 
     public ObjectNode createObjectNode() {
         return mapper.createObjectNode();
+    }
+
+    public JsonNode readJson(String json) {
+        try {
+            return mapper.readTree(json);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -553,6 +578,39 @@ public class ResumeParsingService {
             seen.add(s.toLowerCase(Locale.ROOT));
         }
         return String.join("\n", lines);
+    }
+
+    public String capSummaryWords(String text, int maxWords) {
+        if (text == null || text.isBlank()) {
+            return "";
+        }
+        String cleaned = text.replaceAll("\\s+", " ").trim();
+        String[] words = cleaned.split("\\s+");
+        if (words.length <= maxWords) {
+            return cleaned;
+        }
+        int lastSentenceWordIdx = -1;
+        for (int i = Math.max(0, maxWords - 25); i < maxWords; i++) {
+            if (words[i].endsWith(".") || words[i].endsWith("!") || words[i].endsWith("?")) {
+                lastSentenceWordIdx = i;
+            }
+        }
+        int limit = lastSentenceWordIdx >= 0 ? (lastSentenceWordIdx + 1) : maxWords;
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < limit; i++) {
+            if (i > 0) {
+                sb.append(' ');
+            }
+            sb.append(words[i]);
+        }
+        String truncated = sb.toString()
+                .replaceAll("[,;:\\-–—]+$", "")
+                .replaceAll("(?i)\\s+\\b(and|or|with|for|in|to|by|of|across|using|including|through|while|as|a|an|the)$", "")
+                .trim();
+        if (!truncated.endsWith(".") && !truncated.endsWith("!") && !truncated.endsWith("?")) {
+            truncated += ".";
+        }
+        return truncated;
     }
 }
 

@@ -58,6 +58,16 @@ public class ResumeOptimizationService {
             }
 
             String category = normalizeCategory(s.path("category").asText("EXPERIENCE_IMPROVEMENTS"));
+            if ("PROJECT_IMPROVEMENTS".equals(category)) {
+                // Project suggestions are generated separately by populateProjectSuggestions()
+                continue;
+            }
+            if ("REPLACE_SUMMARY".equals(actionType) || "SUMMARY_IMPROVEMENTS".equals(category)) {
+                String cleanedSum = cleanResumeLine(suggestedText);
+                if (!cleanedSum.isEmpty() && !isInstructionalPhrase(cleanedSum)) {
+                    suggestedText = parsingService.capSummaryWords(cleanedSum, 80);
+                }
+            }
             String targetSection = s.path("targetSection").asText("Experience").trim();
             String originalText = s.path("originalText")
                     .asText(s.path("currentText").asText("")).trim();
@@ -99,6 +109,179 @@ public class ResumeOptimizationService {
         }
     }
 
+    /**
+     * Requests JD-aligned bullet improvements from Groq for every selected project (indices 0..N-1).
+     */
+    public JsonNode fetchProjectSuggestionsFromAi(
+            JsonNode projects,
+            JsonNode skillCategories,
+            String jd) {
+
+        if (projects == null || !projects.isArray() || projects.isEmpty()) {
+            return null;
+        }
+
+        String systemPrompt = """
+                You are an honest, detail-oriented ATS resume editor. Review EVERY project in "projects" (indices 0 to N-1) against "jobDescription".
+                Rules:
+                1. Return EXACTLY one entry in "projectSuggestions" for EVERY project index (0 through N-1). Do NOT skip, merge, or duplicate any project.
+                2. For each project, rewrite its "bullets" into "improvedBullets" using clear, professional, action-oriented, JD-relevant wording while 100% preserving the project's original meaning, architecture, features, technologies, and real details.
+                3. Keep all technologies, tools, metrics, numbers, and achievements strictly truthful to that project and the candidate's "skillCategories". NEVER invent technologies, tools, features, metrics, or claims.
+                4. Never reveal confidential client names or use meta-advice phrases like "Add...", "Consider...", "Rephrase to...", "You should...".
+                5. Provide a concise "issue" (weak wording, unclear framing, or under-highlighted JD relevance in the original description) and "reason" (why the rewrite improves clarity and JD fit).
+                Return ONLY JSON:
+                {
+                  "projectSuggestions": [
+                    {
+                      "projectIndex": 0,
+                      "improvedBullets": [""],
+                      "issue": "",
+                      "reason": ""
+                    }
+                  ]
+                }
+                """;
+
+        ObjectNode payload = parsingService.createObjectNode();
+        ArrayNode projectsForPrompt = payload.putArray("projects");
+        int pIdx = 0;
+        for (JsonNode p : projects) {
+            ObjectNode pn = projectsForPrompt.addObject();
+            pn.put("projectIndex", pIdx++);
+            pn.put("title", p.path("title").asText(""));
+            if (!p.path("technologies").asText("").isBlank()) {
+                pn.put("technologies", p.path("technologies").asText(""));
+            }
+            pn.set("bullets", p.path("bullets"));
+        }
+        if (skillCategories != null && skillCategories.isArray()) {
+            payload.set("skillCategories", skillCategories);
+        }
+        payload.put("jobDescription", jd == null ? "" : jd);
+
+        return parsingService.callGroqJson(systemPrompt, payload.toString());
+    }
+
+    /**
+     * Validates and appends one PROJECT_IMPROVEMENTS suggestion per project (no skipping,
+     * merging, or duplication) showing original bullets alongside improved JD-relevant bullets.
+     */
+    public void populateProjectSuggestions(
+            JsonNode projects,
+            JsonNode ai,
+            String originalResumeText,
+            ArrayNode targetArray) {
+
+        if (projects == null || !projects.isArray() || projects.isEmpty()
+                || ai == null || !ai.path("projectSuggestions").isArray()) {
+            return;
+        }
+
+        Map<Integer, JsonNode> aiByProject = new HashMap<>();
+        for (JsonNode s : ai.path("projectSuggestions")) {
+            int pi = s.path("projectIndex").asInt(-1);
+            if (pi >= 0 && pi < projects.size()) {
+                aiByProject.putIfAbsent(pi, s);
+            }
+        }
+
+        Set<String> allowedNumbers = extractNumbers(originalResumeText);
+        int sugIdx = targetArray.size() + 1;
+
+        for (int pi = 0; pi < projects.size(); pi++) {
+            JsonNode project = projects.get(pi);
+            JsonNode existingBulletsNode = project.path("bullets");
+            List<String> origBullets = new ArrayList<>();
+            if (existingBulletsNode.isArray()) {
+                for (JsonNode b : existingBulletsNode) {
+                    String txt = b.asText("").trim();
+                    if (!txt.isEmpty()) {
+                        origBullets.add(txt);
+                    }
+                }
+            }
+            if (origBullets.isEmpty()) {
+                continue;
+            }
+
+            JsonNode aiEntry = aiByProject.get(pi);
+            if (aiEntry == null || !aiEntry.path("improvedBullets").isArray()) {
+                continue;
+            }
+
+            List<String> improvedBullets = new ArrayList<>();
+            JsonNode rawImproved = aiEntry.path("improvedBullets");
+            for (int bi = 0; bi < rawImproved.size(); bi++) {
+                String cleaned = cleanResumeLine(rawImproved.get(bi).asText(""));
+                if (!cleaned.isEmpty()
+                        && !isInstructionalPhrase(cleaned)
+                        && !hasInventedNumbers(cleaned, allowedNumbers)) {
+                    improvedBullets.add(cleaned);
+                } else if (bi < origBullets.size()) {
+                    improvedBullets.add(origBullets.get(bi));
+                }
+            }
+            if (improvedBullets.isEmpty() || improvedBullets.equals(origBullets)) {
+                continue;
+            }
+
+            String projectTitle = project.path("title").asText("Project " + (pi + 1)).trim();
+            String tech = project.path("technologies").asText("").trim();
+            String issue = aiEntry.path("issue").asText("").trim();
+            String reason = aiEntry.path("reason").asText("").trim();
+
+            String origDisplay = formatBulletsText(origBullets);
+            String improvedDisplay = formatBulletsText(improvedBullets);
+
+            ObjectNode item = targetArray.addObject();
+            item.put("id", "sug-" + sugIdx++);
+            item.put("category", "PROJECT_IMPROVEMENTS");
+            item.put("priority", "medium");
+            item.put("title", "Improve Project: " + projectTitle);
+            item.put("targetSection", "Projects");
+            item.put("projectTitle", projectTitle);
+            if (!tech.isEmpty()) {
+                item.put("projectTechnologies", tech);
+            }
+            ArrayNode origArr = item.putArray("originalBullets");
+            origBullets.forEach(origArr::add);
+            ArrayNode impArr = item.putArray("improvedBullets");
+            improvedBullets.forEach(impArr::add);
+
+            item.put("currentIssue", issue.isEmpty()
+                    ? "Project wording can be clarified and better aligned with JD terminology without altering real details."
+                    : issue);
+            item.put("reason", reason.isEmpty()
+                    ? "Improves clarity, action-verb strength, and alignment with the target job description."
+                    : reason);
+            item.put("explanation", item.path("reason").asText());
+            item.put("suggestedChange", improvedDisplay);
+            item.put("suggestedText", improvedDisplay);
+            item.put("originalText", origDisplay);
+            item.put("currentText", origDisplay);
+            item.put("requiresCandidateVerification", false);
+            item.put("decision", "PENDING");
+            item.put("approved", true);
+            item.put("actionType", "REPLACE_BULLET");
+            item.put("targetEntryIndex", pi);
+            item.put("targetBulletIndex", 0);
+        }
+    }
+
+    private String formatBulletsText(List<String> bullets) {
+        if (bullets.size() == 1) {
+            return bullets.get(0);
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < bullets.size(); i++) {
+            if (i > 0) {
+                sb.append('\n');
+            }
+            sb.append("• ").append(bullets.get(i));
+        }
+        return sb.toString();
+    }
+
     public void applyApprovedSuggestions(
             ObjectNode structured,
             JsonNode suggestions,
@@ -129,9 +312,31 @@ public class ResumeOptimizationService {
             return;
         }
 
-        boolean aiApplied = rewriteResumeWithAi(structured, approvedList, jd, allowedNumbers, originalResumeText);
+        boolean needsAiRewrite = false;
+        for (JsonNode s : approvedList) {
+            String cat = s.path("category").asText("");
+            String act = s.path("actionType").asText("");
+            if (!"PROJECT_IMPROVEMENTS".equals(cat) && !"ADD_SKILL".equals(act) && !"MISSING_SKILLS".equals(cat)) {
+                needsAiRewrite = true;
+                break;
+            }
+        }
+
+        boolean aiApplied = needsAiRewrite
+                && rewriteResumeWithAi(structured, approvedList, jd, allowedNumbers, originalResumeText);
         if (!aiApplied) {
             applyDeterministicRewrites(structured, approvedList, allowedNumbers, originalResumeText);
+        } else {
+            // Approved project suggestions were already validated; apply their exact text.
+            ArrayNode projectOnly = parsingService.createObjectNode().putArray("projectApproved");
+            for (JsonNode s : approvedList) {
+                if ("PROJECT_IMPROVEMENTS".equals(s.path("category").asText(""))) {
+                    projectOnly.add(s);
+                }
+            }
+            if (!projectOnly.isEmpty()) {
+                applyDeterministicRewrites(structured, projectOnly, allowedNumbers, originalResumeText);
+            }
         }
         sanitizeFinalResumeSections(structured);
     }
@@ -147,7 +352,7 @@ public class ResumeOptimizationService {
                 You are an expert ATS resume writer. Convert the approved improvement recommendations into professionally rewritten resume content and return strict JSON.
                 Rules:
                 1. Treat the approved suggestions as recommendations, NOT as literal text to copy-paste.
-                2. Rewrite the candidate's actual "professionalSummary", "experience" bullets, and "projects" bullets so they read as polished, first-person-implied resume statements.
+                2. Rewrite the candidate's actual "professionalSummary" (approximately 75 to 80 words, strictly maximum 80 words), "experience" bullets, and "projects" bullets so they read as polished, first-person-implied resume statements.
                 3. NEVER include instruction phrases such as "Add a sentence such as:", "Rephrase to:", "Consider adding:", "You should mention:", "Highlight", or any meta-advice in the output.
                 4. Preserve 100% of the candidate's original facts, companies, roles, dates, skills, and metrics. Never invent numbers, achievements, or technologies not supported by the original resume.
                 JSON schema:
@@ -174,7 +379,8 @@ public class ResumeOptimizationService {
             return false;
         }
 
-        String newSummary = cleanResumeLine(aiNode.path("professionalSummary").asText(""));
+        String newSummary = parsingService.capSummaryWords(
+                cleanResumeLine(aiNode.path("professionalSummary").asText("")), 80);
         if (newSummary.length() >= 30
                 && !isInstructionalPhrase(newSummary)
                 && !hasInventedNumbers(newSummary, allowedNumbers)) {
@@ -246,14 +452,49 @@ public class ResumeOptimizationService {
             if (("REPLACE_SUMMARY".equals(action) || "SUMMARY_IMPROVEMENTS".equals(category))
                     && !hasInventedNumbers(cleaned, allowedNumbers)) {
                 String existingSummary = structured.path("professionalSummary").asText("").trim();
+                String updatedSummary;
                 if (isAddSentence && !existingSummary.isEmpty() && !existingSummary.contains(cleaned)) {
                     String sep = existingSummary.endsWith(".") ? " " : ". ";
-                    structured.put("professionalSummary", existingSummary + sep + cleaned);
+                    updatedSummary = existingSummary + sep + cleaned;
                 } else {
-                    structured.put("professionalSummary", cleaned);
+                    updatedSummary = cleaned;
                 }
+                structured.put("professionalSummary", parsingService.capSummaryWords(updatedSummary, 80));
             } else if ("ADD_SKILL".equals(action) || "MISSING_SKILLS".equals(category)) {
                 addCleanSkill(structured, cleaned, originalResumeText, true);
+            } else if ("PROJECT_IMPROVEMENTS".equals(category) && s.path("improvedBullets").isArray() && !s.path("improvedBullets").isEmpty()) {
+                if (structured.path("projects").isArray() && !structured.path("projects").isEmpty()) {
+                    ArrayNode projects = (ArrayNode) structured.path("projects");
+                    String projTitle = s.path("projectTitle").asText("").trim();
+                    int targetIdx = -1;
+                    int hintIdx = s.path("targetEntryIndex").asInt(-1);
+                    if (hintIdx >= 0 && hintIdx < projects.size()
+                            && (projTitle.isEmpty() || projects.get(hintIdx).path("title").asText("").trim().equalsIgnoreCase(projTitle))) {
+                        targetIdx = hintIdx;
+                    } else if (!projTitle.isEmpty()) {
+                        for (int i = 0; i < projects.size(); i++) {
+                            if (projects.get(i).path("title").asText("").trim().equalsIgnoreCase(projTitle)) {
+                                targetIdx = i;
+                                break;
+                            }
+                        }
+                    }
+                    if (targetIdx < 0 && hintIdx >= 0 && hintIdx < projects.size()) {
+                        targetIdx = hintIdx;
+                    }
+                    if (targetIdx >= 0) {
+                        ArrayNode newBullets = parsingService.createObjectNode().putArray("bullets");
+                        for (JsonNode b : s.path("improvedBullets")) {
+                            String bt = cleanResumeLine(b.asText(""));
+                            if (!bt.isEmpty() && !isInstructionalPhrase(bt) && !hasInventedNumbers(bt, allowedNumbers)) {
+                                newBullets.add(bt);
+                            }
+                        }
+                        if (!newBullets.isEmpty()) {
+                            ((ObjectNode) projects.get(targetIdx)).set("bullets", newBullets);
+                        }
+                    }
+                }
             } else if (!hasInventedNumbers(cleaned, allowedNumbers)) {
                 boolean isProject = "PROJECT_IMPROVEMENTS".equals(category)
                         || s.path("targetSection").asText("").toLowerCase(Locale.ROOT).contains("project");
@@ -326,8 +567,25 @@ public class ResumeOptimizationService {
         }
     }
 
+    public String buildOptimizedProfileSummary(
+            String aiSummary,
+            JsonNode structured,
+            String originalResumeText) {
+        Set<String> allowedNumbers = extractNumbers(originalResumeText);
+        String cleaned = parsingService.capSummaryWords(cleanResumeLine(aiSummary), 80);
+        if (cleaned.length() >= 30
+                && !isInstructionalPhrase(cleaned)
+                && !hasInventedNumbers(cleaned, allowedNumbers)) {
+            return cleaned;
+        }
+        String existing = parsingService.capSummaryWords(
+                cleanResumeLine(structured.path("professionalSummary").asText("")), 80);
+        return existing;
+    }
+
     private void sanitizeFinalResumeSections(ObjectNode structured) {
-        String summary = cleanResumeLine(structured.path("professionalSummary").asText(""));
+        String summary = parsingService.capSummaryWords(
+                cleanResumeLine(structured.path("professionalSummary").asText("")), 80);
         structured.put("professionalSummary", summary);
 
         for (String sec : new String[] { "experience", "projects" }) {
@@ -402,44 +660,38 @@ public class ResumeOptimizationService {
         }
 
         int total = originalProjects.size();
-        int targetCount = Math.min(total, 10);
         Set<String> allowedNumbers = extractNumbers(originalResumeText);
-
         Map<Integer, JsonNode> aiByIndex = new HashMap<>();
-        Set<Integer> selectedIndices = new LinkedHashSet<>();
-
         if (aiSanitizedProjects != null && aiSanitizedProjects.isArray()) {
             for (JsonNode sp : aiSanitizedProjects) {
                 int idx = sp.path("originalIndex").asInt(-1);
                 if (idx >= 0 && idx < total) {
                     aiByIndex.putIfAbsent(idx, sp);
-                    if (selectedIndices.size() < targetCount) {
-                        selectedIndices.add(idx);
-                    }
                 }
             }
         }
 
-        if (selectedIndices.size() < targetCount) {
-            List<Integer> remaining = new ArrayList<>();
+        // Preserve ALL projects in exact order when <= 10; pick top 10 by JD relevance when > 10.
+        List<Integer> selectedIndices = new ArrayList<>();
+        if (total <= 10) {
             for (int i = 0; i < total; i++) {
-                if (!selectedIndices.contains(i)) {
-                    remaining.add(i);
-                }
+                selectedIndices.add(i);
             }
-            if (total > 10) {
-                remaining.sort((a, b) -> Integer.compare(
-                        scoreProjectRelevance(originalProjects.get(b), jd),
-                        scoreProjectRelevance(originalProjects.get(a), jd)));
+        } else {
+            List<Integer> ranked = new ArrayList<>();
+            for (int i = 0; i < total; i++) {
+                ranked.add(i);
             }
-            for (int idx : remaining) {
-                if (selectedIndices.size() >= targetCount) {
-                    break;
-                }
-                selectedIndices.add(idx);
-            }
+            ranked.sort((a, b) -> {
+                int sa = scoreProjectRelevance(originalProjects.get(a), jd) + (aiByIndex.containsKey(a) ? 2 : 0);
+                int sb = scoreProjectRelevance(originalProjects.get(b), jd) + (aiByIndex.containsKey(b) ? 2 : 0);
+                int cmp = Integer.compare(sb, sa);
+                return cmp != 0 ? cmp : Integer.compare(a, b);
+            });
+            selectedIndices.addAll(ranked.subList(0, 10));
         }
 
+        Set<String> usedTitles = new HashSet<>();
         int projIdx = 1;
         for (int origIdx : selectedIndices) {
             JsonNode orig = originalProjects.get(origIdx);
@@ -452,6 +704,10 @@ public class ResumeOptimizationService {
                     : aiNode.path("genericTitle").asText(aiNode.path("title").asText("")).trim();
 
             String genericTitle = sanitizeProjectTitle(aiTitle, origTitle, tech);
+            if (!usedTitles.add(genericTitle.toLowerCase(Locale.ROOT))) {
+                genericTitle = genericTitle + " (" + projIdx + ")";
+                usedTitles.add(genericTitle.toLowerCase(Locale.ROOT));
+            }
 
             ObjectNode pNode = result.addObject();
             pNode.put("id", "proj-" + projIdx++);
@@ -467,19 +723,21 @@ public class ResumeOptimizationService {
                     : orig.path("bullets");
             pNode.set("originalBullets", origBullets.deepCopy());
 
+            // Keep original bullet details intact (only masking confidential exact project name)
+            // so Project Suggestions can display true Existing vs Improved wording with Approve/Reject.
             ArrayNode bullets = pNode.putArray("bullets");
-            if (aiNode != null && aiNode.path("sanitizedBullets").isArray()) {
-                for (JsonNode b : aiNode.path("sanitizedBullets")) {
+            if (origBullets.isArray()) {
+                for (JsonNode b : origBullets) {
                     String bText = sanitizeProjectBullet(b.asText("").trim(), origTitle);
-                    if (!bText.isEmpty() && !hasInventedNumbers(bText, allowedNumbers)) {
+                    if (!bText.isEmpty()) {
                         bullets.add(bText);
                     }
                 }
             }
-            if (bullets.isEmpty() && origBullets.isArray()) {
-                for (JsonNode b : origBullets) {
+            if (bullets.isEmpty() && aiNode != null && aiNode.path("sanitizedBullets").isArray()) {
+                for (JsonNode b : aiNode.path("sanitizedBullets")) {
                     String bText = sanitizeProjectBullet(b.asText("").trim(), origTitle);
-                    if (!bText.isEmpty()) {
+                    if (!bText.isEmpty() && !hasInventedNumbers(bText, allowedNumbers)) {
                         bullets.add(bText);
                     }
                 }

@@ -208,7 +208,7 @@ public class ResumeService {
             throw new InvalidFileException("jobDescription must contain at least 20 characters");
         }
         String rawText = resume.getExtractedText() == null ? "" : resume.getExtractedText().toLowerCase();
-        boolean hasProjectSection = rawText.contains("projects") || rawText.contains("project details") || rawText.contains("project 1");
+        boolean hasProjectSection = rawText.matches("(?s).*\\bprojects?\\b.*");
         if (resume.getStructuredResume() == null
                 || resume.getStructuredResume().isEmpty()
                 || (hasProjectSection && parsingService.toJsonNode(resume.getStructuredResume()).path("projects").isEmpty())) {
@@ -231,7 +231,7 @@ public class ResumeService {
     public JsonNode optimize(String id, JsonNode request) {
         Resume resume = getResumeById(id);
         String rawText = resume.getExtractedText() == null ? "" : resume.getExtractedText().toLowerCase();
-        boolean hasProjectSection = rawText.contains("projects") || rawText.contains("project details") || rawText.contains("project 1");
+        boolean hasProjectSection = rawText.matches("(?s).*\\bprojects?\\b.*");
         if (resume.getStructuredResume() == null
                 || resume.getStructuredResume().isEmpty()
                 || (hasProjectSection && parsingService.toJsonNode(resume.getStructuredResume()).path("projects").isEmpty())) {
