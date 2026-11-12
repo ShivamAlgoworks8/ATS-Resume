@@ -141,9 +141,9 @@ export class StepUploadComponent implements OnInit {
       this.toast.show('File is empty.');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      this.uploadError.set('File exceeds the 5 MB maximum size limit.');
-      this.toast.show('File exceeds 5 MB limit.');
+    if (file.size > 50 * 1024 * 1024) {
+      this.uploadError.set('File exceeds the 50 MB maximum size limit.');
+      this.toast.show('File exceeds 50 MB limit.');
       return;
     }
     const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
@@ -182,8 +182,8 @@ export class StepUploadComponent implements OnInit {
       this.jdValidationError.set('Selected Job Description file is empty (0 bytes).');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      this.jdValidationError.set('Job Description file exceeds the 5 MB limit.');
+    if (file.size > 50 * 1024 * 1024) {
+      this.jdValidationError.set('Job Description file exceeds the 50 MB limit.');
       return;
     }
     this.state.jdFileName.set(file.name);

@@ -37,7 +37,7 @@ public class ResumeService {
             "docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     );
 
-    private static final long MAX_FILE_SIZE = 5 * 1024 * 1024;
+    private static final long MAX_FILE_SIZE = 50L * 1024 * 1024;
 
     private final ResumeRepository resumeRepository;
     private final ResumeParsingService parsingService;
@@ -271,7 +271,7 @@ public class ResumeService {
         }
 
         if (file.getSize() > MAX_FILE_SIZE) {
-            throw new InvalidFileException("File size exceeds maximum limit of 5MB");
+            throw new InvalidFileException("File size exceeds maximum limit of 50MB");
         }
 
         String originalName = cleanName(file.getOriginalFilename());
