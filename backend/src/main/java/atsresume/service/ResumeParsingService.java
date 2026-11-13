@@ -36,14 +36,23 @@ import org.springframework.web.multipart.MultipartFile;
 public class ResumeParsingService {
 
     private static final Logger log = LoggerFactory.getLogger(ResumeParsingService.class);
+
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
+    // Matches month-year formats like Jan 2022 or January 2022.
     private static final Pattern MONTH_YEAR = Pattern.compile(
             "(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?,?\\s*'?(\\d{2,4})",
             Pattern.CASE_INSENSITIVE);
+
+    // Matches dates in MM/YYYY format, such as 01/2022.
     private static final Pattern SLASH_DATE = Pattern.compile("(\\d{1,2})/(\\d{4})");
+
+    // Matches standalone four-digit years, such as 2022.
     private static final Pattern YEAR_ONLY = Pattern.compile("\\b((?:19|20)\\d{2})\\b");
 
+    // Matches experience durations like 5 years, 5+ years, or 2.5 years.
+    private static final Pattern EXPERIENCE_DURATION = Pattern.compile(
+            "(?i)\\b(\\d+(?:\\.\\d+)?)\\s*\\+?\\s*(?:years?|yrs?)\\b");
     private final Tika tika = new Tika();
     private final ObjectMapper mapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -102,6 +111,7 @@ public class ResumeParsingService {
                 4. Extract ALL work experience entries with their exact startDate and endDate strings (e.g. "Jan 2022", "Present", "Nov 2020").
                 5. Extract ALL education entries and ALL certifications/awards/achievements.
                 6. For "professionalSummary", analyze the candidate's entire resume (experience, core skills, domain expertise, and projects) and craft a strong, polished, ATS-friendly profile summary of approximately 75 to 80 words (strictly maximum 80 words) grounded 100% in the candidate's real resume facts.
+                7. For "skillCategories", extract ONLY concrete technical skills, programming languages, software tools, frameworks, libraries, databases, cloud platforms, hardware systems, and engineering domain skills. Do NOT extract soft skills, interpersonal traits, or generic filler words (e.g. communication, adaptability, attention to detail, technical, management).
                 Return ONLY a JSON object with this exact structure:
                 {
                   "contact": {
@@ -184,7 +194,8 @@ public class ResumeParsingService {
             log.warn("GROQ_API_KEY is not configured in backend/.env");
             return null;
         }
-        Set<String> modelsToTry = new LinkedHashSet<>(List.of(groqModel, "openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.8-27b"));
+        Set<String> modelsToTry = new LinkedHashSet<>(
+                List.of(groqModel, "openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.8-27b"));
         for (String model : modelsToTry) {
             try {
                 ObjectNode payload = mapper.createObjectNode();
@@ -217,7 +228,8 @@ public class ResumeParsingService {
                     continue;
                 }
                 if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                    log.error("Groq API returned HTTP {} on model {}: {}", response.statusCode(), model, response.body());
+                    log.error("Groq API returned HTTP {} on model {}: {}", response.statusCode(), model,
+                            response.body());
                     continue;
                 }
 
@@ -259,7 +271,7 @@ public class ResumeParsingService {
                 ArrayNode skills = mapper.createArrayNode();
                 for (JsonNode s : cat.path("skills")) {
                     String val = s.asText("").trim();
-                    if (!val.isEmpty() && appearsInText(val, sourceText)) {
+                    if (!val.isEmpty() && !ResumeAnalysisService.isNonTechnicalOrSoftSkill(val) && appearsInText(val, sourceText)) {
                         skills.add(val);
                     }
                 }
@@ -398,7 +410,7 @@ public class ResumeParsingService {
             YearMonth start = parseYearMonth(exp.path("startDate").asText(""), false);
             YearMonth end = parseYearMonth(exp.path("endDate").asText(""), true);
             if (start != null && end != null && !end.isBefore(start)) {
-                intervals.add(new YearMonth[]{start, end});
+                intervals.add(new YearMonth[] { start, end });
             }
         }
         if (intervals.isEmpty()) {
@@ -527,7 +539,7 @@ public class ResumeParsingService {
     }
 
     private int monthNumber(String prefix) {
-        String[] months = {"jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"};
+        String[] months = { "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec" };
         String p = prefix.substring(0, 3).toLowerCase(Locale.ROOT);
         for (int i = 0; i < months.length; i++) {
             if (months[i].equals(p)) {
@@ -567,7 +579,8 @@ public class ResumeParsingService {
             if (s.isEmpty()) {
                 continue;
             }
-            if (startsWithTab && lines.size() > 15 && (inDuplicateTabTrailer || seen.contains(s.toLowerCase(Locale.ROOT)))) {
+            if (startsWithTab && lines.size() > 15
+                    && (inDuplicateTabTrailer || seen.contains(s.toLowerCase(Locale.ROOT)))) {
                 inDuplicateTabTrailer = true;
                 continue;
             }
@@ -605,7 +618,9 @@ public class ResumeParsingService {
         }
         String truncated = sb.toString()
                 .replaceAll("[,;:\\-–—]+$", "")
-                .replaceAll("(?i)\\s+\\b(and|or|with|for|in|to|by|of|across|using|including|through|while|as|a|an|the)$", "")
+                .replaceAll(
+                        "(?i)\\s+\\b(and|or|with|for|in|to|by|of|across|using|including|through|while|as|a|an|the)$",
+                        "")
                 .trim();
         if (!truncated.endsWith(".") && !truncated.endsWith("!") && !truncated.endsWith("?")) {
             truncated += ".";
@@ -613,4 +628,3 @@ public class ResumeParsingService {
         return truncated;
     }
 }
-
