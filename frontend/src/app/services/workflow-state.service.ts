@@ -15,6 +15,7 @@ import {
 import { generateLatexDocument } from '../templates/latex-resume.template';
 import { ResumeApiService } from './resume.service';
 import { ToastService } from './toast.service';
+import { isNonTechnicalOrSoftSkill } from '../utils/skills-filter.util';
 
 export type ResumeTemplateId = 'classic-ats' | 'modern-executive' | 'compact-technical';
 
@@ -48,9 +49,62 @@ export class WorkflowStateService {
   readonly hasUploadedResume = computed(() => this.activeResume() !== null);
   readonly hasAnalysis = computed(() => this.analysisResult() !== null);
 
-  readonly suggestions = computed<ResumeSuggestion[]>(
-    () => this.analysisResult()?.suggestions ?? []
-  );
+  readonly suggestions = computed<ResumeSuggestion[]>(() => {
+    const raw = this.analysisResult()?.suggestions ?? [];
+    const struct = this.editableStructured() || this.originalStructured();
+    return raw
+      .filter((s) => {
+        if (s.actionType === 'ADD_SKILL' || s.category === 'MISSING_SKILLS') {
+          const text = s.suggestedChange || s.title || '';
+          return !isNonTechnicalOrSoftSkill(text);
+        }
+        return true;
+      })
+      .map((s) => {
+        const copy: ResumeSuggestion = { ...s };
+        const hasBullets = (copy.originalBullets && copy.originalBullets.length > 0) || (copy.improvedBullets && copy.improvedBullets.length > 0);
+        if (!hasBullets && (!copy.originalText || copy.originalText.trim() === '')) {
+          if (copy.category === 'SUMMARY_IMPROVEMENTS' || copy.actionType === 'REPLACE_SUMMARY' || copy.targetSection?.toLowerCase().includes('summary')) {
+            copy.originalText = struct?.professionalSummary || copy.currentIssue || '';
+            if (!copy.currentIssue || copy.currentIssue === copy.originalText) {
+              copy.currentIssue = 'Summary can be tailored with stronger ATS keywords and role impact.';
+            }
+          } else if (copy.category === 'MISSING_SKILLS' || copy.actionType === 'ADD_SKILL' || copy.category === 'MISSING_KEYWORDS') {
+            copy.originalText = 'Skill not currently listed in your technical skills section.';
+            if (!copy.currentIssue) {
+              copy.currentIssue = 'Target skill from the job description is missing from your resume.';
+            }
+          } else if (
+            copy.category === 'EXPERIENCE_IMPROVEMENTS' ||
+            copy.actionType === 'REPLACE_BULLET' ||
+            copy.targetSection?.toLowerCase().includes('experience')
+          ) {
+            const expList = struct?.experience ?? [];
+            if (expList.length > 0) {
+              const eIdx = Math.max(0, Math.min(copy.targetEntryIndex ?? 0, expList.length - 1));
+              const exp = expList[eIdx];
+              if (exp) {
+                if (!copy.jobTitle) copy.jobTitle = exp.jobTitle;
+                if (!copy.company) copy.company = exp.company;
+                if (exp.bullets && exp.bullets.length > 0) {
+                  const bIdx = Math.max(0, Math.min(copy.targetBulletIndex ?? 0, exp.bullets.length - 1));
+                  copy.originalText = exp.bullets[bIdx];
+                }
+              }
+            }
+            if (!copy.originalText) {
+              copy.originalText = copy.currentIssue || 'Current experience bullet';
+            }
+            if (!copy.currentIssue || copy.currentIssue === copy.originalText) {
+              copy.currentIssue = 'Bullet phrasing lacks strong action verbs, quantifiable achievements, or ATS keyword coverage.';
+            }
+          } else {
+            copy.originalText = copy.currentIssue || 'Current resume content';
+          }
+        }
+        return copy;
+      });
+  });
 
   readonly approvedSuggestions = computed(() =>
     this.suggestions().filter((s) => s.decision === 'APPROVED')
@@ -133,6 +187,15 @@ export class WorkflowStateService {
           ...backendResult,
           isMockPreview: false,
         };
+        // Filter out non-technical generic words and soft skills
+        result.matchedKeywords = (result.matchedKeywords || []).filter((k) => !isNonTechnicalOrSoftSkill(k));
+        result.missingKeywords = (result.missingKeywords || []).filter((k) => !isNonTechnicalOrSoftSkill(k));
+        result.relevantSkills = (result.relevantSkills || []).filter((k) => !isNonTechnicalOrSoftSkill(k));
+        result.extraOrLessRelevantTerms = (result.extraOrLessRelevantTerms || []).filter((k) => !isNonTechnicalOrSoftSkill(k));
+        const totalSkills = result.matchedKeywords.length + result.missingKeywords.length;
+        if (totalSkills > 0) {
+          result.skillsMatchPercentage = Math.round((result.matchedKeywords.length * 100) / totalSkills);
+        }
         if (result.structuredResume) {
           this.originalStructured.set(JSON.parse(JSON.stringify(result.structuredResume)));
           this.editableStructured.set(JSON.parse(JSON.stringify(result.structuredResume)));
@@ -171,6 +234,98 @@ export class WorkflowStateService {
     this.analysisResult.set({ ...current, suggestions: updatedSuggestions });
   }
 
+  addMissingSkill(rawSkill: string): void {
+    if (!rawSkill) return;
+    const cleanSkill = rawSkill
+      .replace(/^[+\-*•\s]+/, '')
+      .replace(/[+\-*•\s]+$/, '')
+      .trim();
+    if (!cleanSkill) return;
+
+    const key = (v: string) => v.toLowerCase().replace(/[\s.\-_/]+/g, '');
+    const cleanKey = key(cleanSkill);
+
+    // 1. Add skill to editableStructured
+    const draft: StructuredResume = JSON.parse(JSON.stringify(this.editableStructured()));
+    if (!draft.skillCategories) {
+      draft.skillCategories = [];
+    }
+    const alreadyExists = draft.skillCategories.some((c) =>
+      c.skills.some((x) => key(x) === cleanKey)
+    );
+
+    if (!alreadyExists) {
+      if (draft.skillCategories.length === 0) {
+        draft.skillCategories.push({
+          id: 'cat-1',
+          categoryName: 'Technical Skills',
+          skills: [cleanSkill],
+        });
+      } else {
+        const targetCat =
+          draft.skillCategories.find((c) =>
+            /tech|core|tool|language|framework|engineering|skill/i.test(c.categoryName)
+          ) || draft.skillCategories[draft.skillCategories.length - 1];
+        targetCat.skills = [...targetCat.skills, cleanSkill];
+      }
+      this.editableStructured.set(draft);
+      this.saveStudioChanges(false);
+    }
+
+    // 2. Update analysisResult in state
+    const currentAnalysis = this.analysisResult();
+    if (currentAnalysis) {
+      const updatedMissing = (currentAnalysis.missingKeywords || []).filter(
+        (k) => key(k) !== cleanKey
+      );
+      const updatedMatched = [...(currentAnalysis.matchedKeywords || [])];
+      if (!updatedMatched.some((k) => key(k) === cleanKey)) {
+        updatedMatched.push(cleanSkill);
+      }
+
+      const totalSkills = updatedMatched.length + updatedMissing.length;
+      const updatedSkillsScore =
+        totalSkills > 0
+          ? Math.round((updatedMatched.length * 100) / totalSkills)
+          : currentAnalysis.skillsMatchPercentage;
+
+      const overall = Math.min(
+        100,
+        Math.max(
+          0,
+          Math.round(
+            updatedSkillsScore * 0.45 +
+              currentAnalysis.experienceRelevance * 0.25 +
+              currentAnalysis.educationRelevance * 0.15 +
+              currentAnalysis.formattingScore * 0.15
+          )
+        )
+      );
+
+      // Auto-approve any suggestion related to adding this skill
+      const updatedSuggestions = (currentAnalysis.suggestions || []).map((sug) => {
+        if (
+          (sug.actionType === 'ADD_SKILL' || sug.category === 'MISSING_SKILLS') &&
+          key(sug.suggestedChange || sug.title || '') === cleanKey
+        ) {
+          return { ...sug, decision: 'APPROVED' as const, approved: true };
+        }
+        return sug;
+      });
+
+      this.analysisResult.set({
+        ...currentAnalysis,
+        missingKeywords: updatedMissing,
+        matchedKeywords: updatedMatched,
+        skillsMatchPercentage: updatedSkillsScore,
+        overallScore: overall,
+        suggestions: updatedSuggestions,
+      });
+    }
+
+    this.toast.show(`Added "${cleanSkill}" to resume skills.`);
+  }
+
   applyApprovedSuggestionsToStudio(): number {
     const approved = this.approvedSuggestions();
     const draft: StructuredResume = JSON.parse(JSON.stringify(this.editableStructured()));
@@ -199,7 +354,7 @@ export class WorkflowStateService {
           .replace(/\s+(?:to|in)\s+(?:your\s+|the\s+)?(?:skills?|resume|section).*$/i, '')
           .split(/[,;/]+/)
           .map((s) => s.trim())
-          .filter((s) => s.length > 0 && s.length <= 35 && !this.isInstructionalPhrase(s));
+          .filter((s) => s.length > 0 && s.length <= 35 && !this.isInstructionalPhrase(s) && !isNonTechnicalOrSoftSkill(s));
         const key = (v: string) => v.toLowerCase().replace(/[\s.\-_/]+/g, '');
         for (const skillToAdd of strippedSkills) {
           const exists = draft.skillCategories.some((c) => c.skills.some((x) => key(x) === key(skillToAdd)));

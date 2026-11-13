@@ -101,6 +101,8 @@ export interface ResumeSuggestion {
   improvedBullets?: string[];
   targetEntryIndex?: number;
   targetBulletIndex?: number;
+  jobTitle?: string;
+  company?: string;
 }
 
 export interface ContactInfo {

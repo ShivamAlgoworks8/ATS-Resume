@@ -177,7 +177,7 @@
         <div class="panel-header-row">
           <div>
             <h2 class="card-title">Missing Skills</h2>
-            <p class="card-subtitle">Target skills from the job description missing in your resume</p>
+            <p class="card-subtitle">Target skills from the job description missing in your resume · Click + to add</p>
           </div>
           <span class="count-badge badge-red">
             {{ state.analysisResult()!.missingKeywords.length }} Missing
@@ -185,7 +185,14 @@
         </div>
         <div class="chip-cloud">
           @for (kw of state.analysisResult()!.missingKeywords; track kw) {
-            <span class="kw-chip kw-missing">+ {{ kw }}</span>
+            <button
+              type="button"
+              class="kw-chip kw-missing kw-addable"
+              (click)="addMissingSkill(kw)"
+              title="Click to add {{ kw }} to resume skills"
+            >
+              <span class="plus-icon">+</span> {{ kw }}
+            </button>
           } @empty {
             <p class="empty-note">All primary job description skills are covered.</p>
           }
@@ -285,57 +292,65 @@
             <h3 class="suggestion-title">{{ item.title }}</h3>
 
             <div class="suggestion-comparison-grid">
-              @if (item.category === 'PROJECT_IMPROVEMENTS' && (item.originalBullets?.length || item.originalText)) {
-                <div class="suggestion-box box-issue">
-                  <span class="box-label">EXISTING PROJECT DESCRIPTION</span>
-                  @if (item.projectTitle) {
-                    <p>
-                      <strong>{{ item.projectTitle }}</strong>
-                      @if (item.projectTechnologies) {
-                        <span> · <em>{{ item.projectTechnologies }}</em></span>
-                      }
-                    </p>
-                  }
-                  @if (item.originalBullets?.length) {
-                    <ul style="margin: 6px 0 8px 18px; padding: 0;">
-                      @for (b of item.originalBullets; track $index) {
-                        <li>{{ b }}</li>
-                      }
-                    </ul>
-                  } @else {
-                    <p>{{ item.originalText }}</p>
-                  }
-                  <p><strong>Observation:</strong> {{ item.currentIssue }}</p>
-                </div>
+              <div class="suggestion-box box-issue">
+                <span class="box-label">{{ getExistingBoxLabel(item) }}</span>
 
-                <div class="suggestion-box box-proposed">
-                  <span class="box-label">IMPROVED PROJECT SUGGESTION</span>
-                  @if (item.improvedBullets?.length) {
-                    <ul style="margin: 6px 0 8px 18px; padding: 0;">
-                      @for (b of item.improvedBullets; track $index) {
-                        <li>{{ b }}</li>
-                      }
-                    </ul>
-                  } @else {
-                    <p>{{ item.suggestedChange }}</p>
-                  }
-                  <p><strong>Why:</strong> {{ item.reason }}</p>
-                </div>
-              } @else {
-                <div class="suggestion-box box-issue">
-                  <span class="box-label">CURRENT OBSERVATION</span>
+                @if (item.projectTitle) {
+                  <p>
+                    <strong>{{ item.projectTitle }}</strong>
+                    @if (item.projectTechnologies) {
+                      <span> · <em>{{ item.projectTechnologies }}</em></span>
+                    }
+                  </p>
+                }
+
+                @if (item.jobTitle || item.company) {
+                  <p>
+                    <strong>{{ item.jobTitle || 'Role' }}</strong>
+                    @if (item.company) {
+                      <span> · <em>{{ item.company }}</em></span>
+                    }
+                  </p>
+                }
+
+                @if (item.originalBullets?.length) {
+                  <ul style="margin: 6px 0 8px 18px; padding: 0;">
+                    @for (b of item.originalBullets; track $index) {
+                      <li>{{ b }}</li>
+                    }
+                  </ul>
+                } @else if (item.originalText) {
+                  <p>{{ item.originalText }}</p>
+                } @else if (item.currentIssue) {
                   <p>{{ item.currentIssue }}</p>
-                  <p><strong>Impact:</strong> {{ item.reason }}</p>
-                </div>
+                }
 
-                <div class="suggestion-box box-proposed">
-                  <span class="box-label">RECOMMENDATION</span>
+                @if (item.currentIssue && item.currentIssue !== item.originalText) {
+                  <p><strong>Observation:</strong> {{ item.currentIssue }}</p>
+                }
+              </div>
+
+              <div class="suggestion-box box-proposed">
+                <span class="box-label">{{ getProposedBoxLabel(item) }}</span>
+
+                @if (item.improvedBullets?.length) {
+                  <ul style="margin: 6px 0 8px 18px; padding: 0;">
+                    @for (b of item.improvedBullets; track $index) {
+                      <li>{{ b }}</li>
+                    }
+                  </ul>
+                } @else {
                   <p>{{ item.suggestedChange }}</p>
-                  @if (item.requiresCandidateVerification) {
-                    <p><strong>Add only if you genuinely have this skill.</strong></p>
-                  }
-                </div>
-              }
+                }
+
+                @if (item.reason) {
+                  <p><strong>Why:</strong> {{ item.reason }}</p>
+                }
+
+                @if (item.requiresCandidateVerification) {
+                  <p><strong>Add only if you genuinely have this skill.</strong></p>
+                }
+              </div>
             </div>
           </div>
         } @empty {
