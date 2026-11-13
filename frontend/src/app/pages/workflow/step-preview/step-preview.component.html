@@ -1,14 +1,14 @@
 <div class="dashboard-page">
   <div class="page-intro-bar no-print">
     <div>
-      <h1 class="page-main-title">Templates</h1>
+      <h1 class="page-main-title">Resume Preview</h1>
       <p class="page-main-subtitle">
-        Select an ATS-friendly resume template and preview or export your resume.
+        Preview and download the generated resume in the Algoworks template.
       </p>
     </div>
     <div class="intro-actions">
       <button type="button" class="btn-outline" (click)="returnToGenerator()">
-        Open Resume Generator
+        ← Resume Generator
       </button>
       <button type="button" class="btn-primary-action" (click)="printOrSaveBrowserPdf()">
         Download PDF
@@ -16,112 +16,12 @@
     </div>
   </div>
 
-  <div class="feature-pillars-grid no-print">
-    @for (tpl of templateCatalog; track tpl.id) {
-      <article
-        class="card feature-pillar-card template-select-card"
-        [class.selected-template-card]="state.selectedTemplate() === tpl.id"
-      >
-        <div class="pillar-top-row">
-          <span class="badge-pill badge-green">{{ tpl.badge }}</span>
-          @if (state.selectedTemplate() === tpl.id) {
-            <span class="active-tpl-indicator">✓ Selected</span>
-          }
-        </div>
-        <h2>{{ tpl.name }}</h2>
-        <p>{{ tpl.description }}</p>
-        <div class="intro-actions">
-          <button
-            type="button"
-            class="btn-outline btn-sm"
-            (click)="state.selectedTemplate.set(tpl.id)"
-          >
-            Preview
-          </button>
-          <button
-            type="button"
-            class="btn-primary-action btn-sm"
-            (click)="selectAndUseTemplate(tpl.id)"
-          >
-            Use Template
-          </button>
-        </div>
-      </article>
-    }
-  </div>
-
   <div class="latex-paper-container">
-    <article
-      class="latex-paper-sheet"
-      [class.template-classic-ats]="state.selectedTemplate() === 'classic-ats'"
-      [class.template-modern-executive]="state.selectedTemplate() === 'modern-executive'"
-      [class.template-compact-technical]="state.selectedTemplate() === 'compact-technical'"
-      aria-label="ATS Resume Template Preview"
-    >
-      <header class="latex-header">
-        <h1 class="latex-name">
-          {{ state.editableStructured().contact.fullName || 'YOUR FULL NAME' }}
-        </h1>
-        <div class="latex-contact-line">
-          @if (state.editableStructured().contact.location) {
-            <span>{{ state.editableStructured().contact.location }}</span>
-          }
-          @if (state.editableStructured().contact.email) {
-            <span>| {{ state.editableStructured().contact.email }}</span>
-          }
-          @if (state.editableStructured().contact.phone) {
-            <span>| {{ state.editableStructured().contact.phone }}</span>
-          }
-        </div>
-      </header>
-
-      @if (state.editableStructured().professionalSummary) {
-        <section class="latex-section">
-          <h2 class="latex-section-heading">SUMMARY</h2>
-          <p class="latex-summary-paragraph">{{ state.editableStructured().professionalSummary }}</p>
-        </section>
-      }
-
-      @if (state.editableStructured().skillCategories.length > 0) {
-        <section class="latex-section">
-          <h2 class="latex-section-heading">SKILLS</h2>
-          <div class="latex-skills-list">
-            @for (cat of state.editableStructured().skillCategories; track cat.id) {
-              @if (cat.skills.length > 0) {
-                <div class="latex-skill-row">
-                  <strong class="latex-skill-cat">{{ cat.categoryName }}:</strong>
-                  <span class="latex-skill-items">{{ cat.skills.join(', ') }}</span>
-                </div>
-              }
-            }
-          </div>
-        </section>
-      }
-
-      @if (state.editableStructured().experience.length > 0) {
-        <section class="latex-section">
-          <h2 class="latex-section-heading">WORK EXPERIENCE</h2>
-          @for (exp of state.editableStructured().experience; track exp.id) {
-            <div class="latex-entry">
-              <div class="latex-entry-row-primary">
-                <strong class="latex-entry-title">{{ exp.jobTitle }}</strong>
-                <span class="latex-entry-date">{{ exp.startDate }} – {{ exp.endDate }}</span>
-              </div>
-              <div class="latex-entry-row-secondary">
-                <em class="latex-entry-org">{{ exp.company }}</em>
-                <em class="latex-entry-loc">{{ exp.location }}</em>
-              </div>
-              <ul class="latex-bullet-list">
-                @for (bullet of exp.bullets; track $index) {
-                  @if (bullet.trim()) {
-                    <li>{{ bullet }}</li>
-                  }
-                }
-              </ul>
-            </div>
-          }
-        </section>
-      }
+    <article class="latex-paper-sheet template-algoworks" aria-label="ATS Resume Preview">
+      <app-algoworks-resume
+        [resume]="state.editableStructured()"
+        [fallbackTitle]="state.jobTitle()"
+      />
     </article>
   </div>
 </div>

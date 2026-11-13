@@ -2,11 +2,8 @@ import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import {
-  ResumeTemplateId,
-  WorkflowStateService,
-} from '../../../services/workflow-state.service';
-import { ResumeApiService } from '../../../services/resume.service';
+import { WorkflowStateService } from '../../../services/workflow-state.service';
+import { AlgoworksResumeComponent } from '../../../shared/algoworks-resume/algoworks-resume.component';
 import {
   AchievementItem,
   ContactInfo,
@@ -16,34 +13,24 @@ import {
   StructuredResume,
   WorkExperienceItem,
 } from '../../../models/resume.models';
-import { generateLatexDocument } from '../../../templates/latex-resume.template';
 
-export interface TemplateOption {
-  id: ResumeTemplateId;
-  name: string;
-  tag: string;
-}
+type StringField<T> = {
+  [K in keyof T]-?: T[K] extends string | undefined ? K : never;
+}[keyof T];
 
 @Component({
   selector: 'app-step-studio',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, AlgoworksResumeComponent],
   templateUrl: './step-studio.component.html',
 })
 export class StepStudioComponent {
   readonly state = inject(WorkflowStateService);
-  private readonly resumeApi = inject(ResumeApiService);
   private readonly router = inject(Router);
 
   readonly activeSectionTab = signal<
     'ALL' | 'CONTACT' | 'SUMMARY' | 'SKILLS' | 'EXPERIENCE' | 'PROJECTS' | 'EDUCATION'
   >('ALL');
-
-  readonly templates: TemplateOption[] = [
-    { id: 'classic-ats', name: 'Classic ATS', tag: 'Standard Serif' },
-    { id: 'modern-executive', name: 'Modern Executive', tag: 'Clean Sans' },
-    { id: 'compact-technical', name: 'Compact Technical', tag: 'High Density' },
-  ];
 
   readonly newSkillInputs = signal<Record<string, string>>({});
   readonly newSkillCategoryName = signal<string>('');
@@ -52,11 +39,6 @@ export class StepStudioComponent {
   readonly editingSkillValue = signal<string>('');
 
   readonly studioFeedbackBanner = signal<string | null>(null);
-  readonly isExportingPdf = signal<boolean>(false);
-
-  selectTemplate(templateId: ResumeTemplateId): void {
-    this.state.selectedTemplate.set(templateId);
-  }
 
   private patchEditable(mutator: (draft: StructuredResume) => void): void {
     const copy: StructuredResume = JSON.parse(
@@ -173,13 +155,13 @@ export class StepStudioComponent {
 
   updateExperienceField(
     expId: string,
-    field: keyof WorkExperienceItem,
-    value: string | boolean
+    field: StringField<WorkExperienceItem>,
+    value: string
   ): void {
     this.patchEditable((draft) => {
       const item = draft.experience.find((e) => e.id === expId);
       if (item) {
-        (item as unknown as Record<string, unknown>)[field] = value;
+        item[field] = value;
       }
     });
   }
@@ -233,13 +215,13 @@ export class StepStudioComponent {
 
   updateProjectField(
     projId: string,
-    field: keyof ProjectItem,
-    value: string | boolean
+    field: StringField<ProjectItem>,
+    value: string
   ): void {
     this.patchEditable((draft) => {
       const item = draft.projects.find((p) => p.id === projId);
       if (item) {
-        (item as unknown as Record<string, unknown>)[field] = value;
+        item[field] = value;
       }
     });
   }
@@ -293,13 +275,13 @@ export class StepStudioComponent {
 
   updateEducationField(
     eduId: string,
-    field: keyof EducationItem,
+    field: StringField<EducationItem>,
     value: string
   ): void {
     this.patchEditable((draft) => {
       const item = draft.education.find((e) => e.id === eduId);
       if (item) {
-        (item as unknown as Record<string, unknown>)[field] = value;
+        item[field] = value;
       }
     });
   }
@@ -327,13 +309,13 @@ export class StepStudioComponent {
 
   updateAchievementField(
     achId: string,
-    field: keyof AchievementItem,
+    field: StringField<AchievementItem>,
     value: string
   ): void {
     this.patchEditable((draft) => {
       const item = draft.achievements.find((a) => a.id === achId);
       if (item) {
-        (item as unknown as Record<string, unknown>)[field] = value;
+        item[field] = value;
       }
     });
   }
@@ -346,113 +328,153 @@ export class StepStudioComponent {
   }
 
   downloadPdf(): void {
-    this.state.saveStudioChanges(false);
-    const resumeId = this.state.activeResume()?.id;
-    const latexCode = generateLatexDocument(this.state.editableStructured());
-
-    if (resumeId) {
-      this.isExportingPdf.set(true);
-      this.resumeApi.generatePdfOnBackend(resumeId, latexCode).subscribe({
-        next: (blob) => {
-          this.isExportingPdf.set(false);
-          this.triggerBlobDownload(blob, 'pdf');
-          this.studioFeedbackBanner.set('PDF downloaded successfully.');
-        },
-        error: () => {
-          this.isExportingPdf.set(false);
-          window.print();
-        },
-      });
-    } else {
-      window.print();
-    }
+    this.state.saveStudioChanges();
+    window.print();
   }
 
-  downloadDocx(): void {
-    this.state.saveStudioChanges(false);
+  getAllSkills(): string[] {
+    const categories = this.state.editableStructured().skillCategories || [];
+    return categories.flatMap((c) => c.skills || []);
+  }
+
+  getSkillGridRows(columns = 4): string[][] {
+    const skills = this.getAllSkills();
+    const rows: string[][] = [];
+    for (let i = 0; i < skills.length; i += columns) {
+      const slice = skills.slice(i, i + columns);
+      while (slice.length < columns) {
+        slice.push('');
+      }
+      rows.push(slice);
+    }
+    return rows;
+  }
+
+  getExperienceTech(exp: WorkExperienceItem | null | undefined): string {
+    const all = this.getAllSkills();
+    if (!exp) return all.slice(0, 8).join(', ');
+    const desc = ((exp.jobTitle || '') + ' ' + (exp.bullets || []).join(' ')).toLowerCase();
+    const matched = all.filter((s) => desc.includes(s.toLowerCase()));
+    return matched.length > 0 ? matched.slice(0, 10).join(', ') : all.slice(0, 8).join(', ');
+  }
+
+  async downloadDocx(): Promise<void> {
+    this.state.saveStudioChanges();
     const r = this.state.editableStructured();
-    const contactParts = [
-      r.contact.location,
-      r.contact.email,
-      r.contact.phone,
-      r.contact.linkedin,
-      r.contact.github,
-      r.contact.portfolio,
-    ].filter((x) => Boolean(x && x.trim()));
+    const logoMarkup = await this.logoMarkup();
+    const allSkills = this.getAllSkills();
 
-    const skillsHtml = r.skillCategories
-      .filter((c) => c.skills.length > 0)
-      .map(
-        (c) =>
-          `<p style="margin:2pt 0;font-size:10.5pt;"><strong>${this.escapeHtml(
-            c.categoryName
-          )}:</strong> ${this.escapeHtml(c.skills.join(', '))}</p>`
-      )
-      .join('');
+    // Build 4-column technology table for DOCX
+    let techTableRows = '';
+    for (let i = 0; i < allSkills.length; i += 4) {
+      const rowSkills = allSkills.slice(i, i + 4);
+      while (rowSkills.length < 4) rowSkills.push('');
+      const cells = rowSkills
+        .map(
+          (s) =>
+            `<td style="border: 1px solid #d1d5db; padding: 5pt 8pt; font-size: 10pt; width: 25%; color: #1f2937;">${this.escapeHtml(
+              s
+            )}</td>`
+        )
+        .join('');
+      techTableRows += `<tr>${cells}</tr>`;
+    }
 
-    const expHtml = r.experience
-      .map(
-        (exp) => `
-        <div style="margin-bottom:8pt;">
-          <p style="margin:0;font-size:11pt;">
-            <strong>${this.escapeHtml(exp.jobTitle)}</strong>
-            ${exp.company ? ` — <em>${this.escapeHtml(exp.company)}</em>` : ''}
-            ${exp.location ? ` (${this.escapeHtml(exp.location)})` : ''}
-            <span style="float:right;font-size:10pt;color:#444;">${this.escapeHtml(
-          exp.startDate
-        )} – ${this.escapeHtml(exp.endDate)}</span>
-          </p>
-          <ul style="margin:3pt 0 0 16pt;padding:0;">
-            ${exp.bullets
-            .filter((b) => b.trim().length > 0)
-            .map(
-              (b) =>
-                `<li style="font-size:10.5pt;margin-bottom:2pt;">${this.escapeHtml(b)}</li>`
-            )
-            .join('')}
-          </ul>
-        </div>`
-      )
-      .join('');
-
-    const projHtml = r.projects
+    // Build Projects HTML
+    const projectsToRender = r.projects.length > 0 ? r.projects : [];
+    const projHtml = projectsToRender
       .map(
         (proj) => `
-        <div style="margin-bottom:8pt;">
-          <p style="margin:0;font-size:11pt;">
-            <strong>${this.escapeHtml(proj.title)}</strong>
-            ${proj.technologies
-            ? ` | <em>${this.escapeHtml(proj.technologies)}</em>`
-            : ''
+        <div style="margin-bottom: 14pt;">
+          <table style="width: 100%; border: none; margin-bottom: 3pt;">
+            <tr>
+              <td style="font-size: 11pt; font-weight: bold; color: #111827;">${this.escapeHtml(
+                proj.title
+              )}</td>
+              <td style="font-size: 10.5pt; text-align: right; color: #374151;">${this.escapeHtml(
+                proj.endDate || proj.startDate || ''
+              )}</td>
+            </tr>
+          </table>
+          ${
+            proj.description
+              ? `<p style="margin: 2pt 0 4pt 0; font-size: 10pt; color: #374151; line-height: 1.45;">${this.escapeHtml(
+                  proj.description
+                )}</p>`
+              : ''
           }
-            ${proj.link
-            ? ` <span style="font-size:9.5pt;color:#444;">(${this.escapeHtml(
-              proj.link
-            )})</span>`
-            : ''
+          ${
+            proj.capabilities
+              ? `<p style="margin: 2pt 0 5pt 0; font-size: 10pt; color: #374151;"><strong>Key Capabilities:</strong> ${this.escapeHtml(
+                  proj.capabilities
+                )}</p>`
+              : ''
           }
-          </p>
-          <ul style="margin:3pt 0 0 16pt;padding:0;">
-            ${proj.bullets
-            .filter((b) => b.trim().length > 0)
-            .map(
-              (b) =>
-                `<li style="font-size:10.5pt;margin-bottom:2pt;">${this.escapeHtml(b)}</li>`
-            )
-            .join('')}
-          </ul>
+          ${
+            proj.technologies
+              ? `<div style="background-color: #f9fafb; border-left: 3.5pt solid #10b981; padding: 6pt 10pt; margin: 5pt 0; font-size: 10pt; color: #1f2937;"><strong>Technology Stack Used:</strong> ${this.escapeHtml(
+                  proj.technologies
+                )}</div>`
+              : ''
+          }
+          ${
+            proj.bullets && proj.bullets.length > 0
+              ? `<p style="margin: 6pt 0 2pt 0; font-size: 10pt; font-weight: bold; color: #1f2937;">Responsibilities</p>
+                 <ul style="margin: 2pt 0 0 16pt; padding: 0;">
+                   ${proj.bullets
+                     .filter((b) => b.trim().length > 0)
+                     .map(
+                       (b) =>
+                         `<li style="font-size: 10pt; color: #374151; margin-bottom: 2pt;">${this.escapeHtml(
+                           b
+                         )}</li>`
+                     )
+                     .join('')}
+                 </ul>`
+              : ''
+          }
         </div>`
       )
       .join('');
+
+    const expHtml =
+      r.projects.length === 0 && r.experience.length > 0
+        ? r.experience
+            .map(
+              (exp) => `
+          <div style="margin-bottom: 12pt;">
+            <p style="margin: 0; font-size: 11pt; font-weight: bold;">
+              ${this.escapeHtml(exp.jobTitle)} — ${this.escapeHtml(exp.company)}
+              <span style="float: right; font-weight: normal; font-size: 10pt; color: #444;">${this.escapeHtml(
+                exp.startDate
+              )} – ${this.escapeHtml(exp.endDate)}</span>
+            </p>
+            <div style="background-color: #f9fafb; border-left: 3.5pt solid #10b981; padding: 5pt 8pt; margin: 4pt 0; font-size: 10pt;">
+              <strong>Technology Stack Used:</strong> ${this.escapeHtml(this.getExperienceTech(exp))}
+            </div>
+            <ul style="margin: 3pt 0 0 16pt; padding: 0;">
+              ${exp.bullets
+                .filter((b) => b.trim().length > 0)
+                .map(
+                  (b) =>
+                    `<li style="font-size: 10pt; margin-bottom: 2pt;">${this.escapeHtml(b)}</li>`
+                )
+                .join('')}
+            </ul>
+          </div>`
+            )
+            .join('')
+        : '';
 
     const eduHtml = r.education
       .map(
         (edu) => `
-        <p style="margin:0 0 6pt 0;font-size:10.5pt;">
+        <p style="margin: 0 0 5pt 0; font-size: 10.5pt;">
           <strong>${this.escapeHtml(edu.institution)}</strong> — ${this.escapeHtml(
           edu.degree
-        )}${edu.fieldOfStudy ? ` in ${this.escapeHtml(edu.fieldOfStudy)}` : ''}${edu.gradeOrHonors ? ` (${this.escapeHtml(edu.gradeOrHonors)})` : ''
-          }
+        )}${edu.fieldOfStudy ? ` in ${this.escapeHtml(edu.fieldOfStudy)}` : ''}${
+          edu.gradeOrHonors ? ` (${this.escapeHtml(edu.gradeOrHonors)})` : ''
+        }
           ${edu.endDate ? ` · ${this.escapeHtml(edu.endDate)}` : ''}
         </p>`
       )
@@ -464,27 +486,49 @@ export class StepStudioComponent {
             xmlns="http://www.w3.org/TR/REC-html40">
       <head>
         <meta charset="utf-8" />
-        <title>${this.escapeHtml(r.contact.fullName || 'ATS Resume')}</title>
+        <title>${this.escapeHtml(r.contact.fullName || 'Algoworks Resume')}</title>
         <style>
-          body { font-family: Calibri, Arial, sans-serif; color: #111; line-height: 1.4; margin: 0.6in; }
-          h1 { font-size: 20pt; margin: 0 0 4pt 0; text-align: center; text-transform: uppercase; }
-          .contact { font-size: 10pt; text-align: center; color: #333; margin-bottom: 12pt; }
-          h2 { font-size: 11.5pt; text-transform: uppercase; border-bottom: 1px solid #222; padding-bottom: 2pt; margin: 12pt 0 6pt 0; }
+          body { font-family: 'Segoe UI', Calibri, Arial, sans-serif; color: #111; line-height: 1.45; margin: 0.5in; }
+          .logo-header { font-size: 18pt; font-weight: bold; color: #00A86B; letter-spacing: 1pt; margin-bottom: 4pt; }
+          .header-line { border-bottom: 2pt solid #111827; margin-bottom: 12pt; }
+          .candidate-name { font-size: 20pt; font-weight: bold; margin: 0 0 2pt 0; color: #111827; }
+          .candidate-title { font-size: 12pt; color: #4b5563; margin: 0 0 2pt 0; }
+          .candidate-exp { font-size: 11pt; color: #4b5563; margin: 0 0 10pt 0; }
+          .section-heading { font-size: 11pt; font-weight: bold; text-transform: uppercase; margin: 14pt 0 6pt 0; color: #111827; letter-spacing: 0.5pt; }
+          table.tech-table { width: 100%; border-collapse: collapse; margin-bottom: 12pt; }
         </style>
       </head>
       <body>
-        <h1>${this.escapeHtml(r.contact.fullName || 'Candidate Name')}</h1>
-        <div class="contact">${this.escapeHtml(contactParts.join(' | '))}</div>
-        ${r.professionalSummary
-        ? `<h2>Professional Summary</h2><p style="font-size:10.5pt;margin:0 0 8pt 0;">${this.escapeHtml(
+        ${logoMarkup}
+        <div class="header-line"></div>
+
+        <div class="candidate-name">${this.escapeHtml(r.contact.fullName || 'Aditya Srivastav')}</div>
+        <div class="candidate-title">${this.escapeHtml(r.contact.title || 'Principal Full Stack Engineer')}</div>
+        <div class="candidate-exp">${this.escapeHtml(r.contact.totalExperience || 'Total Experience: 15 Years')}</div>
+
+        ${
           r.professionalSummary
-        )}</p>`
-        : ''
-      }
-        ${skillsHtml ? `<h2>Skills</h2>${skillsHtml}` : ''}
-        ${expHtml ? `<h2>Work Experience</h2>${expHtml}` : ''}
-        ${projHtml ? `<h2>Projects</h2>${projHtml}` : ''}
-        ${eduHtml ? `<h2>Education</h2>${eduHtml}` : ''}
+            ? `<div class="section-heading">PROFESSIONAL SUMMARY</div>
+               <p style="font-size: 10pt; line-height: 1.5; color: #374151; margin: 0 0 12pt 0;">${this.escapeHtml(
+                 r.professionalSummary
+               )}</p>`
+            : ''
+        }
+
+        ${
+          techTableRows
+            ? `<div class="section-heading">TECHNOLOGY STACK</div>
+               <table class="tech-table">${techTableRows}</table>`
+            : ''
+        }
+
+        ${
+          projHtml || expHtml
+            ? `<div class="section-heading">PROJECT EXPERIENCE</div>${projHtml}${expHtml}`
+            : ''
+        }
+
+        ${eduHtml ? `<div class="section-heading">EDUCATION</div>${eduHtml}` : ''}
       </body>
       </html>
     `;
@@ -493,7 +537,7 @@ export class StepStudioComponent {
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     });
     this.triggerBlobDownload(blob, 'docx');
-    this.studioFeedbackBanner.set('Downloaded ATS-friendly DOCX resume.');
+    this.studioFeedbackBanner.set('Downloaded Algoworks-format ATS DOCX resume.');
   }
 
   private triggerBlobDownload(blob: Blob, ext: 'pdf' | 'docx'): void {
@@ -506,6 +550,23 @@ export class StepStudioComponent {
     link.download = `${cleanName}_Resume.${ext}`;
     link.click();
     URL.revokeObjectURL(url);
+  }
+
+  private async logoMarkup(): Promise<string> {
+    try {
+      const response = await fetch('algoworks-logo.png');
+      if (!response.ok) {
+        return '<div class="logo-header">ALGOWORKS</div>';
+      }
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      let binary = '';
+      for (const byte of bytes) {
+        binary += String.fromCharCode(byte);
+      }
+      return `<img src="data:image/png;base64,${btoa(binary)}" alt="Algoworks" style="height:28pt;" />`;
+    } catch {
+      return '<div class="logo-header">ALGOWORKS</div>';
+    }
   }
 
   private escapeHtml(str: string): string {

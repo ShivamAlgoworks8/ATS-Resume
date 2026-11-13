@@ -17,7 +17,11 @@ import { ResumeApiService } from './resume.service';
 import { ToastService } from './toast.service';
 import { isNonTechnicalOrSoftSkill } from '../utils/skills-filter.util';
 
-export type ResumeTemplateId = 'classic-ats' | 'modern-executive' | 'compact-technical';
+export type ResumeTemplateId =
+  | 'algoworks-ats'
+  | 'classic-ats'
+  | 'modern-executive'
+  | 'compact-technical';
 
 @Injectable({ providedIn: 'root' })
 export class WorkflowStateService {
@@ -36,7 +40,7 @@ export class WorkflowStateService {
 
   readonly originalStructured = signal<StructuredResume>(createEmptyStructuredResume());
   readonly editableStructured = signal<StructuredResume>(createEmptyStructuredResume());
-  readonly selectedTemplate = signal<ResumeTemplateId>('classic-ats');
+  readonly selectedTemplate = signal<ResumeTemplateId>('algoworks-ats');
   readonly appliedSuggestionCount = signal(0);
   readonly lastSavedAt = signal<string | null>(null);
 
@@ -122,25 +126,12 @@ export class WorkflowStateService {
 
   setActiveResume(record: ResumeRecord): void {
     this.activeResume.set(record);
-    const structured = record.structuredResume;
-    if (structured) {
-      this.originalStructured.set(JSON.parse(JSON.stringify(structured)));
-      this.editableStructured.set(JSON.parse(JSON.stringify(structured)));
-    } else {
-      const name = record.originalFileName || record.fileName;
-      this.originalStructured.set(parseExtractedTextToStructuredResume(record.extractedText, name));
-      this.editableStructured.set(parseExtractedTextToStructuredResume(record.extractedText, name));
-      this.resumeApi.reparseResume(record.id).subscribe({
-        next: (updated) => {
-          if (this.activeResume()?.id === updated.id && updated.structuredResume) {
-            this.activeResume.set(updated);
-            this.originalStructured.set(JSON.parse(JSON.stringify(updated.structuredResume)));
-            this.editableStructured.set(JSON.parse(JSON.stringify(updated.structuredResume)));
-          }
-        },
-        error: () => {},
-      });
-    }
+    const parsedOrig = parseExtractedTextToStructuredResume(
+      record.extractedText,
+      record.originalFileName || record.fileName
+    );
+    this.originalStructured.set(parsedOrig);
+    this.editableStructured.set(JSON.parse(JSON.stringify(parsedOrig)));
     this.analysisResult.set(null);
     this.appliedSuggestionCount.set(0);
     this.backendPdfError.set(null);
@@ -206,9 +197,22 @@ export class WorkflowStateService {
         this.toast.show('ATS analysis completed.');
         onComplete();
       },
-      error: (err) => {
+      error: () => {
+        // The current backend does not expose /analyze, so keep the local preview usable
+        // while marking it clearly as an estimate.
+        const computedAnalysis = buildPreviewAtsAnalysis(
+          resume.id,
+          this.editableStructured(),
+          resume.extractedText,
+          requestPayload.jobTitle,
+          requestPayload.companyName,
+          requestPayload.jobDescription
+        );
+        this.analysisResult.set(computedAnalysis);
+        this.recordHistoryEntry(resume, computedAnalysis);
         this.analyzing.set(false);
-        this.toast.show(err?.error?.message || 'Analysis failed. Make sure the backend is running.');
+        this.toast.show('Preview analysis complete. This result was generated locally.');
+        onComplete();
       },
     });
   }
@@ -553,9 +557,7 @@ export class WorkflowStateService {
         }
       },
       error: () => {
-        if (showToast) {
-          this.toast.show('Changes saved in Resume Generator.');
-        }
+        this.toast.show('Could not save changes to the backend. Your edits remain in this session only.');
       },
     });
   }

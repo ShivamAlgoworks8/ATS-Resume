@@ -36,7 +36,7 @@ export class AnalysisHistoryComponent {
 
   openAnalysis(entry: AnalysisHistoryRecord): void {
     this.state.jobTitle.set(entry.jobTitle);
-this.state.companyName.set(entry.companyName);
-this.router.navigate(['/analysis-results']);
+    this.state.companyName.set(entry.companyName);
+    this.router.navigate(['/analysis-results']);
   }
 }

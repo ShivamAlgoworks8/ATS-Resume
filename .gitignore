@@ -4,5 +4,4 @@ target/
 .DS_Store
 uploads/
 .vscode/
-.env
-backend/.env
+.vs/

@@ -19,8 +19,6 @@ export class ResumeApiService {
 
   readonly resumes = signal<ResumeRecord[]>([]);
   readonly loadingResumes = signal(false);
-  readonly backendReachable = signal(true);
-  readonly selectedJd = signal<string>('');
 
   loadResumes(): void {
     this.loadingResumes.set(true);
@@ -28,11 +26,9 @@ export class ResumeApiService {
       next: (list) => {
         this.resumes.set(list);
         this.loadingResumes.set(false);
-        this.backendReachable.set(true);
       },
       error: () => {
         this.loadingResumes.set(false);
-        this.backendReachable.set(false);
       },
     });
   }
@@ -46,7 +42,6 @@ export class ResumeApiService {
     formData.append('file', file);
     return this.http.post<ResumeRecord>(this.baseUrl, formData).pipe(
       tap((created) => {
-        this.backendReachable.set(true);
         this.resumes.update((list) => [created, ...list.filter((r) => r.id !== created.id)]);
       })
     );
