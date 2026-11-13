@@ -7,22 +7,175 @@ import {
 export function createEmptyStructuredResume(): StructuredResume {
   return {
     contact: {
-      fullName: '',
-      email: '',
-      phone: '',
-      location: '',
-      linkedin: '',
-      github: '',
+      fullName: 'Aditya Srivastav',
+      title: 'Principal Full Stack Engineer',
+      totalExperience: 'Total Experience: 15 Years',
+      email: 'aditya.srivastav@example.com',
+      phone: '+91 98765 43210',
+      location: 'New Delhi, India',
+      linkedin: 'linkedin.com/in/adityasrivastav',
+      github: 'github.com/adityasrivastav',
       portfolio: '',
     },
-    professionalSummary: '',
+    professionalSummary:
+      'Principal Full Stack Engineer with 15 years of professional experience working across ES6+, Java, Python, JavaScript, TypeScript, SQL, Go, React.js, Next.js, and Redux. Professional work includes application development, system integration, API-driven workflows, databases, cloud technologies, and structured software delivery supported by the resume. Experienced in translating functional and technical requirements into maintainable implementations, collaborating across engineering activities, troubleshooting issues, and validating technical outcomes.',
     skillCategories: [
-      { id: 'cat-1', categoryName: 'Languages & Core', skills: [] },
-      { id: 'cat-2', categoryName: 'Frameworks & Libraries', skills: [] },
-      { id: 'cat-3', categoryName: 'Databases, Cloud & Tools', skills: [] },
+      {
+        id: 'cat-1',
+        categoryName: 'Core Technologies',
+        skills: [
+          'ES6+',
+          'Java',
+          'Python',
+          'JavaScript',
+          'TypeScript',
+          'SQL',
+          'Go',
+          'React.js',
+          'Next.js',
+          'Redux',
+          'Micro-Frontends',
+          'HTML5',
+          'CSS3',
+          'Tailwind CSS',
+          'Spring Boot',
+          'Spring Cloud',
+          'Node.js',
+          'Express.js',
+          'FastAPI',
+          'REST',
+        ],
+      },
+      {
+        id: 'cat-2',
+        categoryName: 'Architecture & Cloud',
+        skills: [
+          'GraphQL',
+          'gRPC',
+          'OAuth2',
+          'OIDC',
+          'JWT',
+          'Microservices',
+          'Event-Driven Design',
+          'CQRS',
+          'Event Sourcing',
+          'Domain-Driven Design',
+          'Multi-Tenancy',
+          'API Strategy',
+          'Enterprise Architecture',
+          'AWS',
+          'Azure',
+          'GCP',
+          'Docker',
+          'Kubernetes',
+          'Helm',
+          'Terraform',
+        ],
+      },
+      {
+        id: 'cat-3',
+        categoryName: 'DevOps, Data & Tools',
+        skills: [
+          'Jenkins',
+          'GitHub Actions',
+          'GitOps',
+          'Service Mesh',
+          'PostgreSQL',
+          'MySQL',
+          'Oracle',
+          'MongoDB',
+          'Cassandra',
+          'Redis',
+          'Elasticsearch',
+          'Apache Kafka',
+          'RabbitMQ',
+          'Spark',
+          'Airflow',
+          'TensorFlow',
+          'PyTorch',
+          'scikit-learn',
+          'OpenCV',
+          'LLM',
+          'RAG Systems',
+          'Vector Databases',
+          'Prometheus',
+          'Grafana',
+        ],
+      },
     ],
     experience: [],
-    projects: [],
+    projects: [
+      {
+        id: 'proj-1',
+        title: 'Enterprise Payment Orchestration Platform',
+        technologies: 'Spring Boot, PostgreSQL, Kubernetes, Grafana, Redis, Kafka, Java, AWS',
+        link: '',
+        startDate: '',
+        endDate: '2023',
+        description:
+          'Worked on an enterprise Payment Orchestration Platform, including payment integration and reporting dashboards.',
+        capabilities: 'Dashboard development, Database integration, Data visualization',
+        bullets: [
+          'Delivered active-active multi-region deployment with sub-5-minute failover and 99.99% availability.',
+        ],
+      },
+      {
+        id: 'proj-2',
+        title: 'Multi-Tenant Identity & Access Management Platform',
+        technologies: 'Spring Security, PostgreSQL, Kubernetes, OAuth2, Redis, Azure, Java, OIDC',
+        link: '',
+        startDate: '',
+        endDate: '2022',
+        description:
+          'Designed centralized SSO, MFA, and RBAC platform with tenant-level isolation, serving 200+ enterprise tenants and 8M+ users. Achieved SOC Type II and ISO 27001 readiness through audit logging, encryption at rest and in transit, and automated access reviews.',
+        capabilities: 'Role-based access, REST APIs, Database integration',
+        bullets: [
+          'Delivered active-active multi-region deployment with sub-5-minute failover and 99.99% availability.',
+        ],
+      },
+      {
+        id: 'proj-3',
+        title: 'Enterprise Cloud Migration Program',
+        technologies: 'PostgreSQL, Kubernetes, Terraform, Jenkins, Docker, Oracle, Java, AWS',
+        link: '',
+        startDate: '',
+        endDate: '2020',
+        description:
+          'Led migration of 60+ legacy applications and 40+ TB of data to AWS using phased re-platforming, with zero unplanned downtime during cutovers. Built reusable Terraform landing-zone modules and migration runbooks, cutting per-application migration effort by 45%.',
+        capabilities: 'Database integration',
+        bullets: [
+          'Reduced hosting and licensing costs for clients by an average of 35% while improving deployment frequency 10x.',
+        ],
+      },
+      {
+        id: 'proj-4',
+        title: 'Real-Time Analytics & Data Streaming Platform',
+        technologies: 'Spark Streaming, Elasticsearch, Apache Kafka, Python, Docker, Kibana, Kafka, Spark, AWS',
+        link: '',
+        startDate: '',
+        endDate: '2022',
+        description:
+          'Worked on a real-Time Analytics & Data Streaming Platform, including reporting dashboards and search and filtering.',
+        capabilities: 'Dashboard development, Data visualization',
+        bullets: [
+          'Implemented schema evolution, back-pressure handling, and automated replay, achieving 99.95% pipeline availability.',
+        ],
+      },
+      {
+        id: 'proj-5',
+        title: 'Enterprise API Gateway & Developer Platform',
+        technologies:
+          'Spring Cloud Gateway, Spring Cloud, React.js, Node.js, OpenAPI, React, Redis, Java, Kong, AWS, Python, JavaScript, Kubernetes',
+        link: '',
+        startDate: '',
+        endDate: '2020',
+        description: 'Contributed to a business management portal designed to streamline operational workflows.',
+        capabilities: 'Access control, API integration',
+        bullets: [
+          'Handled 150M+ API calls per month with p99 gateway overhead under 15ms. Observability & SRE Platform 2022 2023 Prometheus, Grafana, OpenTelemetry, ELK, Python, Go, Kubernetes.',
+        ],
+      },
+    ],
     education: [],
     achievements: [],
   };
@@ -53,9 +206,122 @@ export function parseExtractedTextToStructuredResume(
   const githubMatch = cleanText.match(/github\.com\/[a-zA-Z0-9_-]+/i);
 
   const inferredName =
-    lines[0] && lines[0].length <= 50 && !lines[0].includes('@')
+    lines[0] && lines[0].length <= 50 && !lines[0].includes('@') && !/summary|experience|stack|skills/i.test(lines[0])
       ? lines[0]
       : fileName.replace(/\.(pdf|docx)$/i, '').replace(/[_-]+/g, ' ');
+
+  const titleMatch = lines.find(
+    (l, idx) =>
+      idx > 0 &&
+      idx < 5 &&
+      /\b(engineer|developer|architect|consultant|manager|lead|specialist|designer|analyst)\b/i.test(l)
+  );
+  const inferredTitle = titleMatch || '';
+
+  const expMatch = lines.find((l) => /total\s+experience\s*:/i.test(l));
+  const inferredTotalExp = expMatch ? expMatch.trim() : '';
+
+  // Check for explicit PROFESSIONAL SUMMARY section
+  let summaryCandidate = '';
+  const summaryIdx = lines.findIndex((l) => /^professional\s+summary$/i.test(l));
+  if (summaryIdx >= 0 && summaryIdx + 1 < lines.length) {
+    summaryCandidate = lines[summaryIdx + 1];
+    if (summaryIdx + 2 < lines.length && !/^(technology\s+stack|skills|projects|experience)/i.test(lines[summaryIdx + 2])) {
+      summaryCandidate += ' ' + lines[summaryIdx + 2];
+    }
+  }
+
+  // Check for PROJECT EXPERIENCE sections in text
+  const parsedProjects: StructuredResume['projects'] = [];
+  const projExpIdx = lines.findIndex((l) => /^project\s+experience$/i.test(l));
+  if (projExpIdx >= 0) {
+    let currentProj: Partial<StructuredResume['projects'][0]> | null = null;
+    let inBullets = false;
+
+    for (let i = projExpIdx + 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (/^(education|certifications|achievements)$/i.test(line)) {
+        if (currentProj && currentProj.title) {
+          parsedProjects.push({
+            id: `proj-${parsedProjects.length + 1}`,
+            title: currentProj.title,
+            technologies: currentProj.technologies || '',
+            link: '',
+            startDate: '',
+            endDate: currentProj.endDate || '',
+            description: currentProj.description || '',
+            capabilities: currentProj.capabilities || '',
+            bullets: currentProj.bullets || [],
+          });
+        }
+        break;
+      }
+
+      // Check for project title line: e.g. "Enterprise Payment Orchestration Platform 2023"
+      const dateMatch = line.match(/\b(19\d\d|20\d\d)\b/);
+      if (
+        dateMatch &&
+        !line.toLowerCase().includes('technology stack') &&
+        !line.toLowerCase().includes('key capabilities') &&
+        !line.toLowerCase().includes('responsibilities') &&
+        line.length < 80
+      ) {
+        if (currentProj && currentProj.title) {
+          parsedProjects.push({
+            id: `proj-${parsedProjects.length + 1}`,
+            title: currentProj.title,
+            technologies: currentProj.technologies || '',
+            link: '',
+            startDate: '',
+            endDate: currentProj.endDate || '',
+            description: currentProj.description || '',
+            capabilities: currentProj.capabilities || '',
+            bullets: currentProj.bullets || [],
+          });
+        }
+        const year = dateMatch[0];
+        const title = line.replace(year, '').trim();
+        currentProj = {
+          title: title || line,
+          endDate: year,
+          bullets: [],
+        };
+        inBullets = false;
+        continue;
+      }
+
+      if (!currentProj) continue;
+
+      if (/key\s+capabilities\s*:/i.test(line)) {
+        currentProj.capabilities = line.replace(/key\s+capabilities\s*:/i, '').trim();
+      } else if (/technology\s+stack\s+used\s*:/i.test(line)) {
+        currentProj.technologies = line.replace(/technology\s+stack\s+used\s*:/i, '').trim();
+      } else if (/responsibilities/i.test(line)) {
+        inBullets = true;
+      } else if (inBullets || line.startsWith('•') || line.startsWith('-')) {
+        const cleanBullet = line.replace(/^[•\-\*]\s*/, '').trim();
+        if (cleanBullet) {
+          currentProj.bullets = [...(currentProj.bullets || []), cleanBullet];
+        }
+      } else if (!currentProj.description && line.length > 20) {
+        currentProj.description = line;
+      }
+    }
+
+    if (currentProj && currentProj.title) {
+      parsedProjects.push({
+        id: `proj-${parsedProjects.length + 1}`,
+        title: currentProj.title,
+        technologies: currentProj.technologies || '',
+        link: '',
+        startDate: '',
+        endDate: currentProj.endDate || '',
+        description: currentProj.description || '',
+        capabilities: currentProj.capabilities || '',
+        bullets: currentProj.bullets || [],
+      });
+    }
+  }
 
   const knownSkillsCatalog: Record<string, string[]> = {
     'Languages & Core': [
@@ -131,7 +397,7 @@ export function parseExtractedTextToStructuredResume(
       )
   );
 
-  const summaryCandidate = contentLines[0] || '';
+  const finalSummary = summaryCandidate || contentLines[0] || '';
   const expBullets = contentLines.slice(1, 5);
   const projBullets = contentLines.slice(5, 8);
 
@@ -144,6 +410,8 @@ export function parseExtractedTextToStructuredResume(
   return {
     contact: {
       fullName: inferredName,
+      title: inferredTitle,
+      totalExperience: inferredTotalExp,
       email: emailMatch ? emailMatch[0] : '',
       phone: phoneMatch ? phoneMatch[0].trim() : '',
       location: '',
@@ -151,7 +419,7 @@ export function parseExtractedTextToStructuredResume(
       github: githubMatch ? githubMatch[0] : '',
       portfolio: '',
     },
-    professionalSummary: summaryCandidate,
+    professionalSummary: finalSummary,
     skillCategories,
     experience:
       expBullets.length > 0
@@ -159,7 +427,7 @@ export function parseExtractedTextToStructuredResume(
             {
               id: 'exp-1',
               company: 'Extracted from Uploaded Resume',
-              jobTitle: 'Professional Experience',
+              jobTitle: inferredTitle || 'Professional Experience',
               location: '',
               startDate: '',
               endDate: 'Present',
@@ -168,7 +436,9 @@ export function parseExtractedTextToStructuredResume(
           ]
         : [],
     projects:
-      projBullets.length > 0
+      parsedProjects.length > 0
+        ? parsedProjects
+        : projBullets.length > 0
         ? [
             {
               id: 'proj-1',
@@ -183,7 +453,7 @@ export function parseExtractedTextToStructuredResume(
               bullets: projBullets,
             },
           ]
-        : [],
+          : [],
     education: eduLine
       ? [
           {
@@ -396,7 +666,7 @@ export function buildPreviewAtsAnalysis(
     jobTitle: jobTitle || 'Target Role',
     companyName: companyName || '',
     analyzedAt: new Date().toISOString(),
-    isMockPreview: false,
+    isMockPreview: true,
     overallScore,
     skillsMatchPercentage,
     experienceRelevance,

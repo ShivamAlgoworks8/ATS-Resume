@@ -8,29 +8,11 @@
     </div>
 
     <div class="intro-actions">
-      <div class="template-selector-group" role="group" aria-label="Select Resume Template">
-        @for (tpl of templates; track tpl.id) {
-          <button
-            type="button"
-            class="template-pill-btn"
-            [class.active]="state.selectedTemplate() === tpl.id"
-            (click)="selectTemplate(tpl.id)"
-          >
-            {{ tpl.name }}
-          </button>
-        }
-      </div>
-
       <button type="button" class="btn-outline" (click)="downloadDocx()">
         Download DOCX
       </button>
-      <button
-        type="button"
-        class="btn-primary-action"
-        [disabled]="isExportingPdf()"
-        (click)="downloadPdf()"
-      >
-        {{ isExportingPdf() ? 'Generating PDF…' : 'Download PDF' }}
+      <button type="button" class="btn-primary-action" (click)="downloadPdf()">
+        Download PDF
       </button>
     </div>
   </div>
@@ -123,6 +105,26 @@
                 [ngModel]="state.editableStructured().contact.fullName"
                 (ngModelChange)="updateContactField('fullName', $event)"
                 placeholder="Full Name"
+              />
+            </div>
+            <div class="form-group">
+              <label>Professional Title</label>
+              <input
+                type="text"
+                class="form-input"
+                [ngModel]="state.editableStructured().contact.title"
+                (ngModelChange)="updateContactField('title', $event)"
+                placeholder="e.g. Principal Full Stack Engineer"
+              />
+            </div>
+            <div class="form-group">
+              <label>Total Experience</label>
+              <input
+                type="text"
+                class="form-input"
+                [ngModel]="state.editableStructured().contact.totalExperience"
+                (ngModelChange)="updateContactField('totalExperience', $event)"
+                placeholder="e.g. Total Experience: 15 Years"
               />
             </div>
             <div class="form-group">
@@ -457,16 +459,47 @@
                     />
                   </div>
                   <div class="form-group">
-                    <label>Technologies</label>
+                    <label>Year / Duration</label>
+                    <input
+                      type="text"
+                      class="form-input"
+                      [ngModel]="proj.endDate || proj.startDate"
+                      (ngModelChange)="updateProjectField(proj.id, 'endDate', $event)"
+                      placeholder="e.g. 2023"
+                    />
+                  </div>
+                  <div class="form-group" style="grid-column: 1 / -1">
+                    <label>Technology Stack Used</label>
                     <input
                       type="text"
                       class="form-input"
                       [ngModel]="proj.technologies"
                       (ngModelChange)="updateProjectField(proj.id, 'technologies', $event)"
+                      placeholder="e.g. Spring Boot, PostgreSQL, Kubernetes, AWS"
                     />
                   </div>
                   <div class="form-group" style="grid-column: 1 / -1">
-                    <label>Project Link</label>
+                    <label>Project Description</label>
+                    <input
+                      type="text"
+                      class="form-input"
+                      [ngModel]="proj.description"
+                      (ngModelChange)="updateProjectField(proj.id, 'description', $event)"
+                      placeholder="e.g. Worked on an enterprise Payment Orchestration Platform..."
+                    />
+                  </div>
+                  <div class="form-group" style="grid-column: 1 / -1">
+                    <label>Key Capabilities</label>
+                    <input
+                      type="text"
+                      class="form-input"
+                      [ngModel]="proj.capabilities"
+                      (ngModelChange)="updateProjectField(proj.id, 'capabilities', $event)"
+                      placeholder="e.g. Dashboard development, Database integration, Data visualization"
+                    />
+                  </div>
+                  <div class="form-group" style="grid-column: 1 / -1">
+                    <label>Project Link (Optional)</label>
                     <input
                       type="text"
                       class="form-input"
@@ -610,15 +643,7 @@
           <div class="preview-header-left">
             <span class="live-dot"></span>
             <strong>Live Resume Preview</strong>
-            <span class="preview-template-badge">
-              {{
-                state.selectedTemplate() === 'classic-ats'
-                  ? 'Classic ATS'
-                  : state.selectedTemplate() === 'modern-executive'
-                    ? 'Modern Executive'
-                    : 'Compact Technical'
-              }}
-            </span>
+            <span class="preview-template-badge">Algoworks ATS</span>
           </div>
           <div class="preview-header-actions">
             <button type="button" class="btn-outline btn-xs" (click)="downloadDocx()">DOCX</button>
@@ -627,146 +652,11 @@
         </div>
 
         <div class="latex-paper-container live-preview-paper-wrap">
-          <article
-            class="latex-paper-sheet"
-            [class.template-classic-ats]="state.selectedTemplate() === 'classic-ats'"
-            [class.template-modern-executive]="state.selectedTemplate() === 'modern-executive'"
-            [class.template-compact-technical]="state.selectedTemplate() === 'compact-technical'"
-            aria-label="Live Resume Preview"
-          >
-            <header class="latex-header">
-              <h1 class="latex-name">
-                {{ state.editableStructured().contact.fullName || 'YOUR FULL NAME' }}
-              </h1>
-              <div class="latex-contact-line">
-                @if (state.editableStructured().contact.location) {
-                  <span>{{ state.editableStructured().contact.location }}</span>
-                }
-                @if (state.editableStructured().contact.email) {
-                  <span>| {{ state.editableStructured().contact.email }}</span>
-                }
-                @if (state.editableStructured().contact.phone) {
-                  <span>| {{ state.editableStructured().contact.phone }}</span>
-                }
-                @if (state.editableStructured().contact.linkedin) {
-                  <span>| {{ state.editableStructured().contact.linkedin }}</span>
-                }
-                @if (state.editableStructured().contact.github) {
-                  <span>| {{ state.editableStructured().contact.github }}</span>
-                }
-              </div>
-            </header>
-
-            @if (state.editableStructured().professionalSummary) {
-              <section class="latex-section">
-                <h2 class="latex-section-heading">SUMMARY</h2>
-                <p class="latex-summary-paragraph">
-                  {{ state.editableStructured().professionalSummary }}
-                </p>
-              </section>
-            }
-
-            @if (state.editableStructured().skillCategories.length > 0) {
-              <section class="latex-section">
-                <h2 class="latex-section-heading">SKILLS</h2>
-                <div class="latex-skills-list">
-                  @for (cat of state.editableStructured().skillCategories; track cat.id) {
-                    @if (cat.skills.length > 0) {
-                      <div class="latex-skill-row">
-                        <strong class="latex-skill-cat">{{ cat.categoryName }}:</strong>
-                        <span class="latex-skill-items">{{ cat.skills.join(', ') }}</span>
-                      </div>
-                    }
-                  }
-                </div>
-              </section>
-            }
-
-            @if (state.editableStructured().experience.length > 0) {
-              <section class="latex-section">
-                <h2 class="latex-section-heading">WORK EXPERIENCE</h2>
-                @for (exp of state.editableStructured().experience; track exp.id) {
-                  <div class="latex-entry">
-                    <div class="latex-entry-row-primary">
-                      <strong class="latex-entry-title">{{ exp.jobTitle }}</strong>
-                      <span class="latex-entry-date">
-                        {{ exp.startDate }}
-                        @if (exp.endDate) {
-                          – {{ exp.endDate }}
-                        }
-                      </span>
-                    </div>
-                    @if (exp.company || exp.location) {
-                      <div class="latex-entry-row-secondary">
-                        <em class="latex-entry-org">{{ exp.company }}</em>
-                        <em class="latex-entry-loc">{{ exp.location }}</em>
-                      </div>
-                    }
-                    <ul class="latex-bullet-list">
-                      @for (bullet of exp.bullets; track $index) {
-                        @if (bullet.trim()) {
-                          <li>{{ bullet }}</li>
-                        }
-                      }
-                    </ul>
-                  </div>
-                }
-              </section>
-            }
-
-            @if (state.editableStructured().projects.length > 0) {
-              <section class="latex-section">
-                <h2 class="latex-section-heading">PROJECTS</h2>
-                @for (proj of state.editableStructured().projects; track proj.id) {
-                  <div class="latex-entry">
-                    <div class="latex-entry-row-primary">
-                      <div>
-                        <strong class="latex-entry-title">{{ proj.title }}</strong>
-                        @if (proj.technologies) {
-                          <span class="latex-proj-tech"> | <em>{{ proj.technologies }}</em></span>
-                        }
-                      </div>
-                      @if (proj.link) {
-                        <span class="latex-entry-date">{{ proj.link }}</span>
-                      }
-                    </div>
-                    <ul class="latex-bullet-list">
-                      @for (bullet of proj.bullets; track $index) {
-                        @if (bullet.trim()) {
-                          <li>{{ bullet }}</li>
-                        }
-                      }
-                    </ul>
-                  </div>
-                }
-              </section>
-            }
-
-            @if (state.editableStructured().education.length > 0) {
-              <section class="latex-section">
-                <h2 class="latex-section-heading">EDUCATION</h2>
-                @for (edu of state.editableStructured().education; track edu.id) {
-                  <div class="latex-entry">
-                    <div class="latex-entry-row-primary">
-                      <strong class="latex-entry-title">{{ edu.institution }}</strong>
-                      <span class="latex-entry-date">{{ edu.endDate }}</span>
-                    </div>
-                    <div class="latex-entry-row-secondary">
-                      <em>
-                        {{ edu.degree }}
-                        @if (edu.fieldOfStudy) {
-                          in {{ edu.fieldOfStudy }}
-                        }
-                        @if (edu.gradeOrHonors) {
-                          ({{ edu.gradeOrHonors }})
-                        }
-                      </em>
-                      <em>{{ edu.location }}</em>
-                    </div>
-                  </div>
-                }
-              </section>
-            }
+          <article class="latex-paper-sheet template-algoworks" aria-label="Live Resume Preview">
+            <app-algoworks-resume
+              [resume]="state.editableStructured()"
+              [fallbackTitle]="state.jobTitle()"
+            />
           </article>
         </div>
       </div>

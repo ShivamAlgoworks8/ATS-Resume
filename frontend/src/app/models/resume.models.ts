@@ -93,6 +93,8 @@ export interface ContactInfo {
   linkedin: string;
   github: string;
   portfolio: string;
+  title?: string;
+  totalExperience?: string;
 }
 
 export interface SkillCategoryGroup {
@@ -120,6 +122,8 @@ export interface ProjectItem {
   startDate: string;
   endDate: string;
   bullets: string[];
+  description?: string;
+  capabilities?: string;
   aiModified?: boolean;
 }
 

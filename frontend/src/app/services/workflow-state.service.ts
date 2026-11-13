@@ -17,7 +17,11 @@ import { generateLatexDocument } from '../templates/latex-resume.template';
 import { ResumeApiService } from './resume.service';
 import { ToastService } from './toast.service';
 
-export type ResumeTemplateId = 'classic-ats' | 'modern-executive' | 'compact-technical';
+export type ResumeTemplateId =
+  | 'algoworks-ats'
+  | 'classic-ats'
+  | 'modern-executive'
+  | 'compact-technical';
 
 @Injectable({ providedIn: 'root' })
 export class WorkflowStateService {
@@ -36,7 +40,7 @@ export class WorkflowStateService {
 
   readonly originalStructured = signal<StructuredResume>(createEmptyStructuredResume());
   readonly editableStructured = signal<StructuredResume>(createEmptyStructuredResume());
-  readonly selectedTemplate = signal<ResumeTemplateId>('classic-ats');
+  readonly selectedTemplate = signal<ResumeTemplateId>('algoworks-ats');
   readonly appliedSuggestionCount = signal(0);
   readonly lastSavedAt = signal<string | null>(null);
 
@@ -73,12 +77,8 @@ export class WorkflowStateService {
       record.extractedText,
       record.originalFileName || record.fileName
     );
-    const parsedEdit = parseExtractedTextToStructuredResume(
-      record.extractedText,
-      record.originalFileName || record.fileName
-    );
     this.originalStructured.set(parsedOrig);
-    this.editableStructured.set(parsedEdit);
+    this.editableStructured.set(JSON.parse(JSON.stringify(parsedOrig)));
     this.analysisResult.set(null);
     this.appliedSuggestionCount.set(0);
     this.backendPdfError.set(null);
@@ -132,7 +132,8 @@ export class WorkflowStateService {
         onComplete();
       },
       error: () => {
-        // Fallback when backend /analyze endpoint is not available
+        // The current backend does not expose /analyze, so keep the local preview usable
+        // while marking it clearly as an estimate.
         const computedAnalysis = buildPreviewAtsAnalysis(
           resume.id,
           this.editableStructured(),
@@ -144,7 +145,7 @@ export class WorkflowStateService {
         this.analysisResult.set(computedAnalysis);
         this.recordHistoryEntry(resume, computedAnalysis);
         this.analyzing.set(false);
-        this.toast.show('ATS analysis complete.');
+        this.toast.show('Preview analysis complete. This result was generated locally.');
         onComplete();
       },
     });
@@ -254,7 +255,7 @@ export class WorkflowStateService {
         this.toast.show('Resume changes saved to backend.');
       },
       error: () => {
-        this.toast.show('Changes saved in Resume Generator.');
+        this.toast.show('Could not save changes to the backend. Your edits remain in this session only.');
       },
     });
   }

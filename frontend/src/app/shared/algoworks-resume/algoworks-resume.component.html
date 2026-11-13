@@ -1,0 +1,155 @@
+<div class="algo-resume-container">
+  <div class="algo-brand-header">
+    <img class="algo-logo-img" src="algoworks-logo.png" alt="Algoworks" />
+  </div>
+  <div class="algo-header-rule"></div>
+
+  <div class="algo-candidate-header">
+    <h1 class="algo-candidate-name">{{ resume().contact.fullName || 'Candidate Name' }}</h1>
+    @if (resume().contact.title || fallbackTitle()) {
+      <div class="algo-candidate-subtitle">{{ resume().contact.title || fallbackTitle() }}</div>
+    }
+    @if (resume().contact.totalExperience) {
+      <div class="algo-candidate-exp">{{ resume().contact.totalExperience }}</div>
+    }
+    @if (contactDetails().length > 0) {
+      <div class="algo-candidate-meta">{{ contactDetails().join(' | ') }}</div>
+    }
+  </div>
+
+  @if (resume().professionalSummary) {
+    <section class="algo-section">
+      <h2 class="algo-section-heading">Professional Summary</h2>
+      <p class="algo-summary-text">{{ resume().professionalSummary }}</p>
+    </section>
+  }
+
+  @if (allSkills().length > 0) {
+    <section class="algo-section">
+      <h2 class="algo-section-heading">Technology Stack</h2>
+      <table class="algo-tech-table">
+        <tbody>
+          @for (row of skillRows(); track $index) {
+            <tr>
+              @for (cell of row; track $index) {
+                <td>{{ cell }}</td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+  }
+
+  @if (resume().projects.length > 0 || resume().experience.length > 0) {
+    <section class="algo-section">
+      <h2 class="algo-section-heading">Project Experience</h2>
+
+      @for (proj of resume().projects; track proj.id) {
+        <div class="algo-project-entry">
+          <div class="algo-proj-header">
+            <strong class="algo-proj-title">{{ proj.title }}</strong>
+            @if (projectDate(proj)) {
+              <span class="algo-proj-date">{{ projectDate(proj) }}</span>
+            }
+          </div>
+          @if (proj.description) {
+            <p class="algo-proj-desc">{{ proj.description }}</p>
+          }
+          @if (proj.capabilities) {
+            <p class="algo-proj-caps"><strong>Key Capabilities:</strong> {{ proj.capabilities }}</p>
+          }
+          @if (proj.technologies) {
+            <div class="algo-tech-box">
+              <strong>Technology Stack Used:</strong> {{ proj.technologies }}
+            </div>
+          }
+          @if (visibleBullets(proj.bullets).length > 0) {
+            <div class="algo-responsibilities">
+              <div class="algo-resp-title">Responsibilities</div>
+              <ul class="algo-bullet-list">
+                @for (bullet of visibleBullets(proj.bullets); track $index) {
+                  <li>{{ bullet }}</li>
+                }
+              </ul>
+            </div>
+          }
+        </div>
+      }
+
+      @for (exp of resume().experience; track exp.id) {
+        <div class="algo-project-entry">
+          <div class="algo-proj-header">
+            <strong class="algo-proj-title">
+              {{ exp.jobTitle }}{{ exp.company ? ' — ' + exp.company : '' }}
+            </strong>
+            @if (experienceDate(exp)) {
+              <span class="algo-proj-date">{{ experienceDate(exp) }}</span>
+            }
+          </div>
+          @if (experienceTech(exp)) {
+            <div class="algo-tech-box">
+              <strong>Technology Stack Used:</strong> {{ experienceTech(exp) }}
+            </div>
+          }
+          @if (visibleBullets(exp.bullets).length > 0) {
+            <div class="algo-responsibilities">
+              <div class="algo-resp-title">Responsibilities</div>
+              <ul class="algo-bullet-list">
+                @for (bullet of visibleBullets(exp.bullets); track $index) {
+                  <li>{{ bullet }}</li>
+                }
+              </ul>
+            </div>
+          }
+        </div>
+      }
+    </section>
+  }
+
+  @if (resume().education.length > 0) {
+    <section class="algo-section">
+      <h2 class="algo-section-heading">Education</h2>
+      @for (edu of resume().education; track edu.id) {
+        <div class="algo-project-entry">
+          <div class="algo-proj-header">
+            <strong class="algo-proj-title">{{ edu.institution }}</strong>
+            @if (edu.startDate || edu.endDate) {
+              <span class="algo-proj-date">
+                {{ edu.startDate }}{{ edu.endDate ? (edu.startDate ? ' – ' : '') + edu.endDate : '' }}
+              </span>
+            }
+          </div>
+          <p class="algo-proj-desc">
+            {{ edu.degree }}{{ edu.fieldOfStudy ? ' in ' + edu.fieldOfStudy : '' }}
+            @if (edu.gradeOrHonors) {
+              ({{ edu.gradeOrHonors }})
+            }
+            @if (edu.location) {
+              — {{ edu.location }}
+            }
+          </p>
+        </div>
+      }
+    </section>
+  }
+
+  @if (resume().achievements.length > 0) {
+    <section class="algo-section">
+      <h2 class="algo-section-heading">Achievements &amp; Certifications</h2>
+      <ul class="algo-bullet-list">
+        @for (ach of resume().achievements; track ach.id) {
+          <li>
+            <strong>{{ ach.title }}</strong>
+            @if (achievementMeta(ach)) {
+              <span> ({{ achievementMeta(ach) }})</span>
+            }
+            @if (ach.description) {
+              <span> — {{ ach.description }}</span>
+            }
+          </li>
+        }
+      </ul>
+    </section>
+  }
+</div>
