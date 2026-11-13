@@ -14,6 +14,10 @@ import {
   WorkExperienceItem,
 } from '../../../models/resume.models';
 
+type StringField<T> = {
+  [K in keyof T]-?: T[K] extends string | undefined ? K : never;
+}[keyof T];
+
 @Component({
   selector: 'app-step-studio',
   standalone: true,
@@ -151,13 +155,13 @@ export class StepStudioComponent {
 
   updateExperienceField(
     expId: string,
-    field: keyof WorkExperienceItem,
-    value: string | boolean
+    field: StringField<WorkExperienceItem>,
+    value: string
   ): void {
     this.patchEditable((draft) => {
       const item = draft.experience.find((e) => e.id === expId);
       if (item) {
-        (item as unknown as Record<string, unknown>)[field] = value;
+        item[field] = value;
       }
     });
   }
@@ -211,13 +215,13 @@ export class StepStudioComponent {
 
   updateProjectField(
     projId: string,
-    field: keyof ProjectItem,
-    value: string | boolean
+    field: StringField<ProjectItem>,
+    value: string
   ): void {
     this.patchEditable((draft) => {
       const item = draft.projects.find((p) => p.id === projId);
       if (item) {
-        (item as unknown as Record<string, unknown>)[field] = value;
+        item[field] = value;
       }
     });
   }
@@ -271,13 +275,13 @@ export class StepStudioComponent {
 
   updateEducationField(
     eduId: string,
-    field: keyof EducationItem,
+    field: StringField<EducationItem>,
     value: string
   ): void {
     this.patchEditable((draft) => {
       const item = draft.education.find((e) => e.id === eduId);
       if (item) {
-        (item as unknown as Record<string, unknown>)[field] = value;
+        item[field] = value;
       }
     });
   }
@@ -305,13 +309,13 @@ export class StepStudioComponent {
 
   updateAchievementField(
     achId: string,
-    field: keyof AchievementItem,
+    field: StringField<AchievementItem>,
     value: string
   ): void {
     this.patchEditable((draft) => {
       const item = draft.achievements.find((a) => a.id === achId);
       if (item) {
-        (item as unknown as Record<string, unknown>)[field] = value;
+        item[field] = value;
       }
     });
   }
@@ -346,7 +350,7 @@ export class StepStudioComponent {
     return rows;
   }
 
-  getExperienceTech(exp: any): string {
+  getExperienceTech(exp: WorkExperienceItem | null | undefined): string {
     const all = this.getAllSkills();
     if (!exp) return all.slice(0, 8).join(', ');
     const desc = ((exp.jobTitle || '') + ' ' + (exp.bullets || []).join(' ')).toLowerCase();
