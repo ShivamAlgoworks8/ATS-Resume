@@ -1,8 +1,4 @@
-import {
-  AtsAnalysisResponse,
-  ResumeSuggestion,
-  StructuredResume,
-} from '../models/resume.models';
+import { StructuredResume } from '../models/resume.models';
 
 export function createEmptyStructuredResume(): StructuredResume {
   return {
@@ -430,7 +426,7 @@ export function parseExtractedTextToStructuredResume(
               jobTitle: inferredTitle || 'Professional Experience',
               location: '',
               startDate: '',
-              endDate: 'Present',
+              endDate: '',
               bullets: expBullets,
             },
           ]
@@ -442,7 +438,7 @@ export function parseExtractedTextToStructuredResume(
         ? [
             {
               id: 'proj-1',
-              title: 'Extracted Project Experience',
+              title: '',
               technologies: skillCategories
                 .flatMap((c) => c.skills)
                 .slice(0, 5)
@@ -459,7 +455,7 @@ export function parseExtractedTextToStructuredResume(
           {
             id: 'edu-1',
             institution: eduLine,
-            degree: 'Degree (Parsed from Resume)',
+            degree: '',
             fieldOfStudy: '',
             location: '',
             startDate: '',

@@ -2,6 +2,7 @@ package com.atsresume.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDateTime;
+import java.util.Map;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -23,6 +24,18 @@ public class Resume {
     private String extractedText;
     private LocalDateTime uploadDate;
     private ProcessingStatus processingStatus;
+
+    // Parsed resume sections (editable) and how they were produced: GROQ or HEURISTIC
+    private Map<String, Object> structuredResume;
+    private String parsingMethod;
+    private int totalExperienceMonths;
+
+    @JsonIgnore
+    private Map<String, Object> lastAnalysis;
+
+    // Stores the raw AI result (as JSON text) for the last analysis input so identical scans stay identical
+    @JsonIgnore
+    private Map<String, Object> analysisAiCache;
 
     public Resume() {
     }
@@ -110,5 +123,49 @@ public class Resume {
 
     public void setProcessingStatus(ProcessingStatus processingStatus) {
         this.processingStatus = processingStatus;
+    }
+
+    public Map<String, Object> getStructuredResume() {
+        return structuredResume;
+    }
+
+    public void setStructuredResume(Map<String, Object> structuredResume) {
+        this.structuredResume = structuredResume;
+    }
+
+    public String getParsingMethod() {
+        return parsingMethod;
+    }
+
+    public void setParsingMethod(String parsingMethod) {
+        this.parsingMethod = parsingMethod;
+    }
+
+    public int getTotalExperienceMonths() {
+        return totalExperienceMonths;
+    }
+
+    public void setTotalExperienceMonths(int totalExperienceMonths) {
+        this.totalExperienceMonths = totalExperienceMonths;
+    }
+
+    @JsonIgnore
+    public Map<String, Object> getLastAnalysis() {
+        return lastAnalysis;
+    }
+
+    @JsonIgnore
+    public void setLastAnalysis(Map<String, Object> lastAnalysis) {
+        this.lastAnalysis = lastAnalysis;
+    }
+
+    @JsonIgnore
+    public Map<String, Object> getAnalysisAiCache() {
+        return analysisAiCache;
+    }
+
+    @JsonIgnore
+    public void setAnalysisAiCache(Map<String, Object> analysisAiCache) {
+        this.analysisAiCache = analysisAiCache;
     }
 }

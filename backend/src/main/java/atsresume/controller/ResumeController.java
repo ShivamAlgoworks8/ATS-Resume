@@ -3,6 +3,7 @@ package com.atsresume.controller;
 import com.atsresume.dto.ResumeUpdateRequest;
 import com.atsresume.model.Resume;
 import com.atsresume.service.ResumeService;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -75,5 +76,30 @@ public class ResumeController {
     public ResponseEntity<Void> deleteResume(@PathVariable String id) {
         resumeService.deleteResume(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping(value = "/extract-text", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<java.util.Map<String, String>> extractText(@RequestPart("file") MultipartFile file) {
+        return ResponseEntity.ok(java.util.Map.of("text", resumeService.extractPlainText(file)));
+    }
+
+    @PostMapping("/{id}/analyze")
+    public ResponseEntity<JsonNode> analyze(@PathVariable String id, @RequestBody JsonNode request) {
+        return ResponseEntity.ok(resumeService.analyze(id, request));
+    }
+
+    @PutMapping("/{id}/structured")
+    public ResponseEntity<JsonNode> saveStructured(@PathVariable String id, @RequestBody JsonNode structured) {
+        return ResponseEntity.ok(resumeService.saveStructured(id, structured));
+    }
+
+    @PostMapping("/{id}/optimize")
+    public ResponseEntity<JsonNode> optimize(@PathVariable String id, @RequestBody JsonNode request) {
+        return ResponseEntity.ok(resumeService.optimize(id, request));
+    }
+
+    @PostMapping("/{id}/reparse")
+    public ResponseEntity<Resume> reparse(@PathVariable String id) {
+        return ResponseEntity.ok(resumeService.reparse(id));
     }
 }

@@ -2,7 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { WorkflowStateService } from '../../../services/workflow-state.service';
-import { SuggestionCategory } from '../../../models/resume.models';
+import { ResumeSuggestion, SuggestionCategory } from '../../../models/resume.models';
 
 @Component({
   selector: 'app-step-suggestions',
@@ -48,6 +48,48 @@ export class StepSuggestionsComponent {
   getCategoryBadgeLabel(category: SuggestionCategory): string {
     const found = this.categories.find((c) => c.key === category);
     return found ? found.label : category;
+  }
+
+  getExistingBoxLabel(item: ResumeSuggestion): string {
+    switch (item.category) {
+      case 'PROJECT_IMPROVEMENTS':
+        return 'EXISTING PROJECT DESCRIPTION';
+      case 'EXPERIENCE_IMPROVEMENTS':
+      case 'ACHIEVEMENTS_METRICS':
+        return 'EXISTING EXPERIENCE DESCRIPTION';
+      case 'SUMMARY_IMPROVEMENTS':
+        return 'EXISTING PROFESSIONAL SUMMARY';
+      case 'MISSING_SKILLS':
+      case 'MISSING_KEYWORDS':
+        return 'CURRENT SKILLS STATUS';
+      case 'FORMATTING_IMPROVEMENTS':
+        return 'CURRENT FORMATTING STATUS';
+      case 'CONTENT_REMOVAL':
+        return 'EXISTING CONTENT TO CLEAN UP';
+      default:
+        return 'EXISTING DESCRIPTION';
+    }
+  }
+
+  getProposedBoxLabel(item: ResumeSuggestion): string {
+    switch (item.category) {
+      case 'PROJECT_IMPROVEMENTS':
+        return 'IMPROVED PROJECT SUGGESTION';
+      case 'EXPERIENCE_IMPROVEMENTS':
+      case 'ACHIEVEMENTS_METRICS':
+        return 'IMPROVED EXPERIENCE SUGGESTION';
+      case 'SUMMARY_IMPROVEMENTS':
+        return 'IMPROVED SUMMARY SUGGESTION';
+      case 'MISSING_SKILLS':
+      case 'MISSING_KEYWORDS':
+        return 'SUGGESTED SKILL ADDITION';
+      case 'FORMATTING_IMPROVEMENTS':
+        return 'RECOMMENDED FORMATTING FIX';
+      case 'CONTENT_REMOVAL':
+        return 'RECOMMENDED CLEANUP';
+      default:
+        return 'RECOMMENDED IMPROVEMENT';
+    }
   }
 
   approveItem(id: string): void {

@@ -63,7 +63,7 @@
                 [class.active]="item.decision === 'SKIPPED'"
                 (click)="skipItem(item.id)"
               >
-                {{ item.decision === 'SKIPPED' ? 'Skipped' : 'Skip' }}
+                {{ item.decision === 'SKIPPED' ? 'Rejected' : 'Reject' }}
               </button>
             </div>
           </div>
@@ -72,14 +72,63 @@
 
           <div class="suggestion-comparison-grid">
             <div class="suggestion-box box-issue">
-              <span class="box-label">OBSERVATION</span>
-              <p>{{ item.currentIssue }}</p>
-              <p><strong>Impact:</strong> {{ item.reason }}</p>
+              <span class="box-label">{{ getExistingBoxLabel(item) }}</span>
+
+              @if (item.projectTitle) {
+                <p>
+                  <strong>{{ item.projectTitle }}</strong>
+                  @if (item.projectTechnologies) {
+                    <span> · <em>{{ item.projectTechnologies }}</em></span>
+                  }
+                </p>
+              }
+
+              @if (item.jobTitle || item.company) {
+                <p>
+                  <strong>{{ item.jobTitle || 'Role' }}</strong>
+                  @if (item.company) {
+                    <span> · <em>{{ item.company }}</em></span>
+                  }
+                </p>
+              }
+
+              @if (item.originalBullets?.length) {
+                <ul style="margin: 6px 0 8px 18px; padding: 0;">
+                  @for (b of item.originalBullets; track $index) {
+                    <li>{{ b }}</li>
+                  }
+                </ul>
+              } @else if (item.originalText) {
+                <p>{{ item.originalText }}</p>
+              } @else if (item.currentIssue) {
+                <p>{{ item.currentIssue }}</p>
+              }
+
+              @if (item.currentIssue && item.currentIssue !== item.originalText) {
+                <p><strong>Observation:</strong> {{ item.currentIssue }}</p>
+              }
             </div>
 
             <div class="suggestion-box box-proposed">
-              <span class="box-label">RECOMMENDED IMPROVEMENT</span>
-              <p>{{ item.suggestedChange }}</p>
+              <span class="box-label">{{ getProposedBoxLabel(item) }}</span>
+
+              @if (item.improvedBullets?.length) {
+                <ul style="margin: 6px 0 8px 18px; padding: 0;">
+                  @for (b of item.improvedBullets; track $index) {
+                    <li>{{ b }}</li>
+                  }
+                </ul>
+              } @else {
+                <p>{{ item.suggestedChange }}</p>
+              }
+
+              @if (item.reason) {
+                <p><strong>Why:</strong> {{ item.reason }}</p>
+              }
+
+              @if (item.requiresCandidateVerification) {
+                <p><strong>Add only if you genuinely have this skill.</strong></p>
+              }
             </div>
           </div>
         </div>

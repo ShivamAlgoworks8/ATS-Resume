@@ -11,6 +11,9 @@ export interface ResumeRecord {
   extractedText: string | null;
   uploadDate: string;
   processingStatus: ProcessingStatus;
+  structuredResume?: StructuredResume | null;
+  parsingMethod?: 'GROQ' | 'HEURISTIC' | null;
+  totalExperienceMonths?: number;
 }
 
 export interface ResumeMetadataUpdatePayload {
@@ -59,6 +62,11 @@ export interface AtsAnalysisResponse {
   readabilityChecks: ReadabilityCheck[];
   executiveSummary: string;
   suggestions: ResumeSuggestion[];
+  aiPowered?: boolean;
+  parsingMethod?: string;
+  totalExperienceYears?: number;
+  semanticMatches?: { jdTerm: string; resumeEvidence: string }[];
+  structuredResume?: StructuredResume;
 }
 
 export type SuggestionCategory =
@@ -70,6 +78,8 @@ export type SuggestionCategory =
   | 'ACHIEVEMENTS_METRICS'
   | 'FORMATTING_IMPROVEMENTS'
   | 'CONTENT_REMOVAL';
+
+export type SuggestionActionType = 'ADD_SKILL' | 'REPLACE_SUMMARY' | 'REPLACE_BULLET' | 'ADVICE';
 
 export type SuggestionDecision = 'PENDING' | 'APPROVED' | 'SKIPPED';
 
@@ -83,6 +93,16 @@ export interface ResumeSuggestion {
   suggestedChange: string;
   requiresCandidateVerification: boolean;
   decision: SuggestionDecision;
+  actionType?: SuggestionActionType;
+  originalText?: string;
+  projectTitle?: string;
+  projectTechnologies?: string;
+  originalBullets?: string[];
+  improvedBullets?: string[];
+  targetEntryIndex?: number;
+  targetBulletIndex?: number;
+  jobTitle?: string;
+  company?: string;
 }
 
 export interface ContactInfo {

@@ -1,12 +1,14 @@
 package com.atsresume.service;
 
 import com.atsresume.dto.ResumeUpdateRequest;
-import com.atsresume.model.ProcessingStatus;
-import com.atsresume.model.Resume;
 import com.atsresume.exception.FileStorageException;
 import com.atsresume.exception.InvalidFileException;
 import com.atsresume.exception.ResourceNotFoundException;
+import com.atsresume.model.ProcessingStatus;
+import com.atsresume.model.Resume;
 import com.atsresume.repository.ResumeRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -14,10 +16,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
-import org.apache.tika.Tika;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,14 +37,24 @@ public class ResumeService {
             "docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     );
 
-    private static final long MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+    private static final long MAX_FILE_SIZE = 50L * 1024 * 1024;
 
     private final ResumeRepository resumeRepository;
-    private final Tika tika = new Tika();
+    private final ResumeParsingService parsingService;
+    private final ResumeAnalysisService analysisService;
+    private final ResumeOptimizationService optimizationService;
     private final Path uploadDir;
 
-    public ResumeService(ResumeRepository resumeRepository, @Value("${app.upload.dir:uploads}") String uploadDir) {
+    public ResumeService(
+            ResumeRepository resumeRepository,
+            ResumeParsingService parsingService,
+            ResumeAnalysisService analysisService,
+            ResumeOptimizationService optimizationService,
+            @Value("${app.upload.dir:uploads}") String uploadDir) {
         this.resumeRepository = resumeRepository;
+        this.parsingService = parsingService;
+        this.analysisService = analysisService;
+        this.optimizationService = optimizationService;
         this.uploadDir = Paths.get(uploadDir).toAbsolutePath().normalize();
         try {
             Files.createDirectories(this.uploadDir);
@@ -66,7 +79,8 @@ public class ResumeService {
         resume.setProcessingStatus(ProcessingStatus.PENDING);
 
         saveFileToDisk(file, storedFileName);
-        extractText(resume);
+        parsingService.extractText(resume, uploadDir.resolve(storageName(resume)));
+        parsingService.parseStructured(resume);
 
         try {
             return resumeRepository.save(resume);
@@ -140,7 +154,8 @@ public class ResumeService {
                 resume.setFileName(cleanName(fileName));
             }
 
-            extractText(resume);
+            parsingService.extractText(resume, uploadDir.resolve(storageName(resume)));
+            parsingService.parseStructured(resume);
 
             try {
                 Resume savedResume = resumeRepository.save(resume);
@@ -163,6 +178,87 @@ public class ResumeService {
         return resumeRepository.save(resume);
     }
 
+    public String extractPlainText(MultipartFile file) {
+        validateFile(file);
+        return parsingService.extractPlainText(file);
+    }
+
+    public Resume reparse(String id) {
+        Resume resume = getResumeById(id);
+        parsingService.parseStructured(resume);
+        return resumeRepository.save(resume);
+    }
+
+    public JsonNode saveStructured(String id, JsonNode structured) {
+        Resume resume = getResumeById(id);
+        if (structured == null || !structured.isObject()) {
+            throw new InvalidFileException("Structured resume body must be a JSON object");
+        }
+        ObjectNode normalized = parsingService.normalizeStructured(structured, resume.getExtractedText());
+        resume.setStructuredResume(parsingService.toMap(normalized));
+        resume.setTotalExperienceMonths(parsingService.calculateExperienceMonths(normalized));
+        resumeRepository.save(resume);
+        return normalized;
+    }
+
+    public JsonNode analyze(String id, JsonNode request) {
+        Resume resume = getResumeById(id);
+        String jd = request == null ? "" : request.path("jobDescription").asText("").trim();
+        if (jd.length() < 20) {
+            throw new InvalidFileException("jobDescription must contain at least 20 characters");
+        }
+        String rawText = resume.getExtractedText() == null ? "" : resume.getExtractedText().toLowerCase();
+        boolean hasProjectSection = rawText.matches("(?s).*\\bprojects?\\b.*");
+        if (resume.getStructuredResume() == null
+                || resume.getStructuredResume().isEmpty()
+                || (hasProjectSection && parsingService.toJsonNode(resume.getStructuredResume()).path("projects").isEmpty())) {
+            parsingService.parseStructured(resume);
+        }
+
+        String jobTitle = request.path("jobTitle").asText("").trim();
+        String companyName = request.path("companyName").asText("").trim();
+        JsonNode structured = parsingService.toJsonNode(resume.getStructuredResume());
+        int totalMonths = parsingService.calculateExperienceMonths(structured);
+        resume.setTotalExperienceMonths(totalMonths);
+
+        ObjectNode analysis = analysisService.analyzeResume(resume, structured, jobTitle, companyName, jd, totalMonths);
+        resume.setStructuredResume(parsingService.toMap(structured));
+        resume.setLastAnalysis(parsingService.toMap(analysis));
+        resumeRepository.save(resume);
+        return analysis;
+    }
+
+    public JsonNode optimize(String id, JsonNode request) {
+        Resume resume = getResumeById(id);
+        String rawText = resume.getExtractedText() == null ? "" : resume.getExtractedText().toLowerCase();
+        boolean hasProjectSection = rawText.matches("(?s).*\\bprojects?\\b.*");
+        if (resume.getStructuredResume() == null
+                || resume.getStructuredResume().isEmpty()
+                || (hasProjectSection && parsingService.toJsonNode(resume.getStructuredResume()).path("projects").isEmpty())) {
+            parsingService.parseStructured(resume);
+        }
+
+        ObjectNode structured = (ObjectNode) parsingService.toJsonNode(resume.getStructuredResume());
+        Set<String> approvedIds = new HashSet<>();
+        if (request != null && request.path("approvedSuggestionIds").isArray()) {
+            request.path("approvedSuggestionIds").forEach(n -> approvedIds.add(n.asText()));
+        }
+
+        if (resume.getLastAnalysis() != null && !approvedIds.isEmpty()) {
+            JsonNode lastAnalysisNode = parsingService.toJsonNode(resume.getLastAnalysis());
+            JsonNode suggestions = lastAnalysisNode.path("suggestions");
+            String jd = (request != null && !request.path("jobDescription").asText("").isBlank())
+                    ? request.path("jobDescription").asText("").trim()
+                    : lastAnalysisNode.path("jobDescription").asText("").trim();
+            optimizationService.applyApprovedSuggestions(structured, suggestions, approvedIds, jd, resume.getExtractedText());
+        }
+
+        resume.setStructuredResume(parsingService.toMap(structured));
+        resume.setTotalExperienceMonths(parsingService.calculateExperienceMonths(structured));
+        resumeRepository.save(resume);
+        return structured;
+    }
+
     public void deleteResume(String id) {
         Resume resume = getResumeById(id);
         resumeRepository.delete(resume);
@@ -175,7 +271,7 @@ public class ResumeService {
         }
 
         if (file.getSize() > MAX_FILE_SIZE) {
-            throw new InvalidFileException("File size exceeds maximum limit of 5MB");
+            throw new InvalidFileException("File size exceeds maximum limit of 50MB");
         }
 
         String originalName = cleanName(file.getOriginalFilename());
@@ -186,9 +282,8 @@ public class ResumeService {
             throw new InvalidFileException("Only PDF and DOCX files are allowed");
         }
 
-        // Verify actual MIME type via Tika to catch renamed files
-        try (InputStream in = file.getInputStream()) {
-            String detectedMime = tika.detect(in);
+        try {
+            String detectedMime = parsingService.detectMimeType(file);
             if (!ALLOWED_TYPES.get(extension).equals(detectedMime)) {
                 throw new InvalidFileException("File content does not match its ." + extension + " extension");
             }
@@ -199,7 +294,6 @@ public class ResumeService {
         return extension;
     }
 
-    // Strip path segments to prevent path traversal
     private String cleanName(String name) {
         if (name == null || name.isBlank()) {
             return "resume";
@@ -211,7 +305,6 @@ public class ResumeService {
         return (baseName.isBlank() || ".".equals(baseName) || "..".equals(baseName)) ? "resume" : baseName;
     }
 
-    // Fallback to fileName for older documents created before storageFileName existed
     private String storageName(Resume resume) {
         String storageFileName = resume.getStorageFileName();
         if (storageFileName == null || storageFileName.isBlank()) {
@@ -236,18 +329,6 @@ public class ResumeService {
             Files.deleteIfExists(uploadDir.resolve(storedFileName));
         } catch (IOException e) {
             log.warn("Could not delete stored file: {}", storedFileName, e);
-        }
-    }
-
-    private void extractText(Resume resume) {
-        try {
-            String text = tika.parseToString(uploadDir.resolve(storageName(resume)));
-            resume.setExtractedText((text != null) ? text.trim() : "");
-            resume.setProcessingStatus(ProcessingStatus.COMPLETED);
-        } catch (Exception e) {
-            log.error("Text extraction failed for resume file {}: {}", resume.getFileName(), e.getMessage());
-            resume.setExtractedText(null);
-            resume.setProcessingStatus(ProcessingStatus.FAILED);
         }
     }
 }
